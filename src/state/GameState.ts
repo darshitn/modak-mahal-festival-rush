@@ -74,6 +74,69 @@ export class GameState {
   }
 
   /**
+   * Check if player can afford an upgrade while preserving minimum working capital reserve (12 coins).
+   */
+  public canAffordUpgrade(cost: number): boolean {
+    return this.coins - cost >= this.config.minWorkingCapitalReserve;
+  }
+
+  /**
+   * Buy Carrying Capacity Upgrade (30 coins -> 2 bundles/batches, 6 boxes).
+   */
+  public buyCarryUpgrade(): boolean {
+    if (this.upgrades.hasCarryUpgrade) return false;
+    if (!this.canAffordUpgrade(this.config.carryUpgradeCost)) return false;
+
+    this.coins -= this.config.carryUpgradeCost;
+    this.upgrades.hasCarryUpgrade = true;
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Buy Packer Helper (45 coins).
+   */
+  public buyPacker(): boolean {
+    if (this.upgrades.hasPacker) return false;
+    if (!this.canAffordUpgrade(this.config.packerCost)) return false;
+
+    this.coins -= this.config.packerCost;
+    this.upgrades.hasPacker = true;
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Buy Cashier Helper (60 coins).
+   */
+  public buyCashier(): boolean {
+    if (this.upgrades.hasCashier) return false;
+    if (!this.canAffordUpgrade(this.config.cashierCost)) return false;
+
+    this.coins -= this.config.cashierCost;
+    this.upgrades.hasCashier = true;
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Buy Second Steamer (90 coins).
+   */
+  public buySecondSteamer(): boolean {
+    if (this.upgrades.hasSecondSteamer) return false;
+    if (!this.canAffordUpgrade(this.config.secondSteamerCost)) return false;
+
+    this.coins -= this.config.secondSteamerCost;
+    this.upgrades.hasSecondSteamer = true;
+    const steamer2 = this.steamers.find(s => s.id === 1);
+    if (steamer2) {
+      steamer2.unlocked = true;
+    }
+    this.notify();
+    return true;
+  }
+
+  /**
    * Action: Buy recipe bundle from supplier.
    * Costs 12 coins, adds 1 bundle to ingredient storage shelf.
    */
@@ -221,7 +284,9 @@ export class GameState {
 
     if (canPack) {
       this.packingTable.isPacking = true;
-      this.packingTable.timer += deltaSeconds;
+      // Packer helper works faster (1.5x speed) and automatically
+      const speedMultiplier = this.upgrades.hasPacker ? 1.5 : 1.0;
+      this.packingTable.timer += deltaSeconds * speedMultiplier;
       this.packingTable.progress = Math.min(1, this.packingTable.timer / this.config.packingTimeSeconds);
 
       if (this.packingTable.timer >= this.config.packingTimeSeconds) {
@@ -239,6 +304,28 @@ export class GameState {
         this.notify();
       }
     }
+  }
+
+  /**
+   * Cashier NPC automated service:
+   * Serves waiting front customer directly from counter shelf stock.
+   */
+  public autoServeWithCashier(requestedBoxes: number): { success: boolean; coinsEarned: number } {
+    if (!this.upgrades.hasCashier) return { success: false, coinsEarned: 0 };
+    if (!Number.isInteger(requestedBoxes) || requestedBoxes <= 0) {
+      return { success: false, coinsEarned: 0 };
+    }
+    if (this.counterBoxesStock < requestedBoxes) {
+      return { success: false, coinsEarned: 0 };
+    }
+
+    this.counterBoxesStock -= requestedBoxes;
+    const payment = requestedBoxes * this.config.boxSalePrice;
+    this.coins += payment;
+    this.stats.totalBoxesSold += requestedBoxes;
+    this.stats.totalRevenue += payment;
+    this.notify();
+    return { success: true, coinsEarned: payment };
   }
 
   /**
@@ -281,34 +368,40 @@ export class GameState {
   /**
    * Action: Serve customer.
    * Customer requires `requestedBoxes`.
-   * Can be fulfilled from player's carried boxes OR counter stock shelf.
+   * Can pool boxes carried by the player with boxes already on the counter.
+   * The transaction is all-or-nothing so a failed attempt never consumes stock
+   * or pays for only part of an order.
    */
   public serveCustomer(requestedBoxes: number): { success: boolean; coinsEarned: number } {
-    let fulfilled = false;
+    if (!Number.isInteger(requestedBoxes) || requestedBoxes <= 0) {
+      return { success: false, coinsEarned: 0 };
+    }
 
-    // Check player carried first
-    if (this.carried.type === 'box' && this.carried.count >= requestedBoxes) {
-      this.carried.count -= requestedBoxes;
+    const carriedBoxes = this.carried.type === 'box' ? this.carried.count : 0;
+    const totalAvailable = carriedBoxes + this.counterBoxesStock;
+
+    // Check the full order before mutating either inventory location.
+    if (totalAvailable < requestedBoxes) {
+      return { success: false, coinsEarned: 0 };
+    }
+
+    const boxesFromCarried = Math.min(carriedBoxes, requestedBoxes);
+    const boxesFromCounter = requestedBoxes - boxesFromCarried;
+
+    if (boxesFromCarried > 0) {
+      this.carried.count -= boxesFromCarried;
       if (this.carried.count === 0) {
-        this.carried.type = null;
+        this.carried = { type: null, count: 0 };
       }
-      fulfilled = true;
-    } else if (this.counterBoxesStock >= requestedBoxes) {
-      // Fulfilled from counter stock
-      this.counterBoxesStock -= requestedBoxes;
-      fulfilled = true;
     }
+    this.counterBoxesStock -= boxesFromCounter;
 
-    if (fulfilled) {
-      const payment = requestedBoxes * this.config.boxSalePrice;
-      this.coins += payment;
-      this.stats.totalBoxesSold += requestedBoxes;
-      this.stats.totalRevenue += payment;
-      this.notify();
-      return { success: true, coinsEarned: payment };
-    }
-
-    return { success: false, coinsEarned: 0 };
+    const payment = requestedBoxes * this.config.boxSalePrice;
+    this.coins += payment;
+    this.stats.totalBoxesSold += requestedBoxes;
+    this.stats.totalRevenue += payment;
+    this.notify();
+    return { success: true, coinsEarned: payment };
   }
 
   /**

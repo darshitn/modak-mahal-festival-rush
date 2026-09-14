@@ -28,19 +28,20 @@
 ---
 
 ## Milestone 2: Growth, Staff & Upgrades
-- [ ] **M2.1 Customer Queue Expansion**
-  - [ ] Implement `CustomerManager` with multi-customer queuing (up to 4 customers)
-  - [ ] Introduce customer patience timer and 2-box orders
-- [ ] **M2.2 Upgrade Kiosk**
-  - [ ] Implement `UpgradeStation` with proximity UI for purchasing unlocks
-  - [ ] Add Carrying Capacity upgrade (30 coins -> 2 batches / 6 boxes)
-  - [ ] Add Second Steamer unlock (90 coins -> unlocks Steamer 2)
-- [ ] **M2.3 Staff Automation**
-  - [ ] Implement Packer NPC (45 coins) stationed at packing table
-  - [ ] Implement Cashier NPC (60 coins) stationed at counter to auto-serve from counter shelf
-  - [ ] Implement station buffers and capacity caps
-- [ ] **M2.4 Milestone 2 Verification**
-  - [ ] Verify upgrades charge once, staff automate workflows without duping items, and build succeeds
+- [x] **M2.1 Customer Queue Expansion**
+  - [x] Implement multi-customer queuing (up to 4 customers in queue)
+  - [x] Introduce customer queue pathing and 2-box orders
+- [x] **M2.2 Upgrade Kiosk**
+  - [x] Implement `UpgradeStation` with proximity UI for purchasing unlocks
+  - [x] Add Carrying Capacity upgrade (30 coins -> 2 batches / 6 boxes)
+  - [x] Add Second Steamer unlock (90 coins -> unlocks Steamer 2)
+  - [x] Strictly preserve 12-coin working-capital reserve on all purchases
+- [x] **M2.3 Staff Automation**
+  - [x] Implement Packer NPC (45 coins) stationed at packing table (faster auto-packing)
+  - [x] Implement Cashier NPC (60 coins) stationed at counter to auto-serve from counter shelf
+  - [x] Implement visible locked vs active states for staff and equipment
+- [x] **M2.4 Milestone 2 Verification**
+  - [x] Verify upgrades charge once, staff automate workflows without duping items, and build succeeds
 
 ---
 

@@ -75,11 +75,14 @@ export class SteamerStation extends BaseStation {
   public updateDisplay() {
     const steamer = this.gameState.steamers.find(s => s.id === this.steamerId);
     if (!steamer || !steamer.unlocked) {
-      this.statusText.setText('Locked');
+      this.mainSprite.setTexture('station_steamer_locked');
+      this.statusText.setText('Locked (Buy at Upgrade Desk)');
+      this.statusText.setStyle({ color: '#ffb74d', backgroundColor: '#263238' });
       this.cookedPlateSprite.setVisible(false);
       return;
     }
 
+    this.mainSprite.setTexture('station_steamer');
     if (steamer.state === 'idle') {
       this.statusText.setText('Idle (Load Bundle)');
       this.statusText.setStyle({ color: '#b0bec5', backgroundColor: '#263238' });

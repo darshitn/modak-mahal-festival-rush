@@ -126,4 +126,143 @@ describe('Modak Mahal Economy & State Loop (M1)', () => {
     expect(state.carried.count).toBe(0);
     expect(state.ingredientStorageBundles).toBe(BALANCE.startingBundles);
   });
+
+  it('deposits an incomplete box amount at the counter and frees the player to keep producing', () => {
+    const state = new GameState({ startingCash: 0, startingBundles: 1 });
+    state.carried = { type: 'box', count: 1 };
+
+    expect(state.serveCustomer(2)).toEqual({ success: false, coinsEarned: 0 });
+    expect(state.carried).toEqual({ type: 'box', count: 1 });
+    expect(state.counterBoxesStock).toBe(0);
+
+    expect(state.depositBoxesToCounter()).toBe(true);
+    expect(state.carried).toEqual({ type: null, count: 0 });
+    expect(state.counterBoxesStock).toBe(1);
+
+    // Hands are free to pick up existing ingredients even with no cash.
+    expect(state.pickupBundle()).toBe(true);
+    expect(state.carried).toEqual({ type: 'bundle', count: 1 });
+  });
+
+  it('pools carried and counter boxes to fulfill one order with exactly one payment', () => {
+    const state = new GameState({ startingCash: 0, startingBundles: 0 });
+    state.carried = { type: 'box', count: 1 };
+    state.counterBoxesStock = 1;
+
+    expect(state.serveCustomer(2)).toEqual({ success: true, coinsEarned: 20 });
+    expect(state.carried).toEqual({ type: null, count: 0 });
+    expect(state.counterBoxesStock).toBe(0);
+    expect(state.coins).toBe(20);
+    expect(state.stats.totalBoxesSold).toBe(2);
+    expect(state.stats.totalRevenue).toBe(20);
+
+    // Repeating the same request cannot duplicate stock or payment.
+    expect(state.serveCustomer(2)).toEqual({ success: false, coinsEarned: 0 });
+    expect(state.coins).toBe(20);
+    expect(state.stats.totalBoxesSold).toBe(2);
+  });
+
+  it('leaves both inventories unchanged when pooled stock cannot fill the order', () => {
+    const state = new GameState({ startingCash: 7, startingBundles: 0 });
+    state.carried = { type: 'box', count: 1 };
+    state.counterBoxesStock = 1;
+
+    expect(state.serveCustomer(3)).toEqual({ success: false, coinsEarned: 0 });
+    expect(state.carried).toEqual({ type: 'box', count: 1 });
+    expect(state.counterBoxesStock).toBe(1);
+    expect(state.coins).toBe(7);
+    expect(state.stats.totalBoxesSold).toBe(0);
+    expect(state.stats.totalRevenue).toBe(0);
+  });
+
+  describe('M2 Upgrades, Staff Automation & Working Capital', () => {
+    it('enforces 12-coin working capital reserve on all purchases', () => {
+      // Carry upgrade costs 30. With 40 coins: 40 - 30 = 10 (< 12 reserve), so purchase must fail!
+      const state = new GameState({ startingCash: 40 });
+      expect(state.canAffordUpgrade(30)).toBe(false);
+      expect(state.buyCarryUpgrade()).toBe(false);
+      expect(state.coins).toBe(40);
+      expect(state.upgrades.hasCarryUpgrade).toBe(false);
+
+      // With 42 coins: 42 - 30 = 12 (>= 12 reserve), purchase succeeds!
+      state.coins = 42;
+      expect(state.canAffordUpgrade(30)).toBe(true);
+      expect(state.buyCarryUpgrade()).toBe(true);
+      expect(state.coins).toBe(12);
+      expect(state.upgrades.hasCarryUpgrade).toBe(true);
+
+      // Cannot buy again
+      expect(state.buyCarryUpgrade()).toBe(false);
+      expect(state.coins).toBe(12);
+    });
+
+    it('expands carry capacity upon carry upgrade', () => {
+      const state = new GameState();
+      expect(state.getCarryCapacity('bundle')).toBe(1);
+      expect(state.getCarryCapacity('batch')).toBe(1);
+      expect(state.getCarryCapacity('box')).toBe(3);
+
+      state.coins = 100;
+      expect(state.buyCarryUpgrade()).toBe(true);
+      expect(state.getCarryCapacity('bundle')).toBe(2);
+      expect(state.getCarryCapacity('batch')).toBe(2);
+      expect(state.getCarryCapacity('box')).toBe(6);
+    });
+
+    it('packer helper automates and accelerates batch packaging', () => {
+      const state = new GameState();
+      state.coins = 100;
+      expect(state.buyPacker()).toBe(true);
+      expect(state.upgrades.hasPacker).toBe(true);
+
+      state.packingTable.inputBatches = 1;
+      // When isPlayerInteracting is false, packer still packs!
+      state.updatePackingTable(1.0, false);
+      expect(state.packingTable.isPacking).toBe(true);
+
+      // With 1.5x speed, 2 seconds total finishes 3s packing (1.0 + 1.1 = 2.1s * 1.5 = 3.15s)
+      state.updatePackingTable(1.1, false);
+      expect(state.packingTable.inputBatches).toBe(0);
+      expect(state.packingTable.outputBoxes).toBe(3);
+    });
+
+    it('cashier helper auto-serves customer from counter stock', () => {
+      const state = new GameState();
+      state.coins = 100;
+      expect(state.buyCashier()).toBe(true);
+      expect(state.upgrades.hasCashier).toBe(true);
+
+      state.counterBoxesStock = 2;
+      const initialCoins = state.coins;
+
+      const res = state.autoServeWithCashier(2);
+      expect(res.success).toBe(true);
+      expect(res.coinsEarned).toBe(20);
+      expect(state.counterBoxesStock).toBe(0);
+      expect(state.coins).toBe(initialCoins + 20);
+      expect(state.stats.totalBoxesSold).toBe(2);
+    });
+
+    it('second steamer unlocks and cooks in parallel', () => {
+      const state = new GameState();
+      expect(state.steamers[1].unlocked).toBe(false);
+
+      state.coins = 150;
+      expect(state.buySecondSteamer()).toBe(true);
+      expect(state.steamers[1].unlocked).toBe(true);
+
+      // Load both steamers
+      state.carried = { type: 'bundle', count: 1 };
+      expect(state.loadSteamer(0)).toBe(true);
+      state.carried = { type: 'bundle', count: 1 };
+      expect(state.loadSteamer(1)).toBe(true);
+
+      expect(state.steamers[0].state).toBe('steaming');
+      expect(state.steamers[1].state).toBe('steaming');
+
+      state.updateSteamers(8.5);
+      expect(state.steamers[0].state).toBe('ready');
+      expect(state.steamers[1].state).toBe('ready');
+    });
+  });
 });

@@ -253,6 +253,141 @@ export class BootScene extends Phaser.Scene {
 
     this.textures.addCanvas('station_packing', packCanvas);
 
+    // Locked Steamer 2 Station (Blueprint / Padlock)
+    const lockedSteamerCanvas = document.createElement('canvas');
+    lockedSteamerCanvas.width = 80;
+    lockedSteamerCanvas.height = 64;
+    const lsCtx = lockedSteamerCanvas.getContext('2d')!;
+
+    lsCtx.fillStyle = '#263238';
+    lsCtx.beginPath();
+    lsCtx.roundRect(10, 14, 60, 44, 8);
+    lsCtx.fill();
+    lsCtx.strokeStyle = '#546e7a';
+    lsCtx.lineWidth = 2;
+    lsCtx.stroke();
+
+    // Padlock body
+    lsCtx.fillStyle = '#ffb300';
+    lsCtx.beginPath();
+    lsCtx.roundRect(30, 32, 20, 16, 4);
+    lsCtx.fill();
+    // Shackle
+    lsCtx.strokeStyle = '#ffd54f';
+    lsCtx.lineWidth = 3;
+    lsCtx.beginPath();
+    lsCtx.arc(40, 32, 7, Math.PI, 0, false);
+    lsCtx.stroke();
+
+    this.textures.addCanvas('station_steamer_locked', lockedSteamerCanvas);
+
+    // Upgrade Station (Mahal Office / Desk)
+    const upCanvas = document.createElement('canvas');
+    upCanvas.width = 90;
+    upCanvas.height = 64;
+    const upCtx = upCanvas.getContext('2d')!;
+
+    // Desk wood
+    upCtx.fillStyle = '#3e2723';
+    upCtx.beginPath();
+    upCtx.roundRect(6, 12, 78, 46, 6);
+    upCtx.fill();
+    upCtx.fillStyle = '#5d4037';
+    upCtx.fillRect(10, 16, 70, 36);
+
+    // Ledger book & brass bell
+    upCtx.fillStyle = '#fff9c4';
+    upCtx.fillRect(16, 22, 22, 16);
+    upCtx.fillStyle = '#d84315';
+    upCtx.fillRect(26, 22, 2, 16);
+
+    // Brass bell
+    upCtx.fillStyle = '#ffd54f';
+    upCtx.beginPath();
+    upCtx.arc(58, 30, 8, 0, Math.PI * 2);
+    upCtx.fill();
+
+    this.textures.addCanvas('station_upgrade', upCanvas);
+
+    // Diya (Brass Lamp with Flame)
+    const diyaCanvas = document.createElement('canvas');
+    diyaCanvas.width = 24;
+    diyaCanvas.height = 24;
+    const dCtx = diyaCanvas.getContext('2d')!;
+    dCtx.fillStyle = '#ffb300';
+    dCtx.beginPath();
+    dCtx.ellipse(12, 16, 8, 4, 0, 0, Math.PI * 2);
+    dCtx.fill();
+    // Warm flame
+    dCtx.fillStyle = '#ff5722';
+    dCtx.beginPath();
+    dCtx.moveTo(12, 6);
+    dCtx.quadraticCurveTo(15, 12, 12, 14);
+    dCtx.quadraticCurveTo(9, 12, 12, 6);
+    dCtx.fill();
+    dCtx.fillStyle = '#ffeb3b';
+    dCtx.beginPath();
+    dCtx.arc(12, 11, 2, 0, Math.PI * 2);
+    dCtx.fill();
+    this.textures.addCanvas('diya', diyaCanvas);
+
+    // Staff Packer Texture
+    const packerCanvas = document.createElement('canvas');
+    packerCanvas.width = 44;
+    packerCanvas.height = 44;
+    const pkrCtx = packerCanvas.getContext('2d')!;
+    pkrCtx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    pkrCtx.beginPath();
+    pkrCtx.ellipse(22, 38, 14, 5, 0, 0, Math.PI * 2);
+    pkrCtx.fill();
+    // Green festive kurta
+    pkrCtx.fillStyle = '#2e7d32';
+    pkrCtx.beginPath();
+    pkrCtx.roundRect(12, 16, 20, 20, 5);
+    pkrCtx.fill();
+    // Yellow apron
+    pkrCtx.fillStyle = '#fff59d';
+    pkrCtx.fillRect(15, 20, 14, 14);
+    // Head
+    pkrCtx.fillStyle = '#ffcc80';
+    pkrCtx.beginPath();
+    pkrCtx.arc(22, 12, 7, 0, Math.PI * 2);
+    pkrCtx.fill();
+    // Green headband
+    pkrCtx.fillStyle = '#1b5e20';
+    pkrCtx.fillRect(15, 7, 14, 3);
+    this.textures.addCanvas('staff_packer', packerCanvas);
+
+    // Staff Cashier Texture
+    const cashCanvas = document.createElement('canvas');
+    cashCanvas.width = 44;
+    cashCanvas.height = 44;
+    const cshCtx = cashCanvas.getContext('2d')!;
+    cshCtx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    cshCtx.beginPath();
+    cshCtx.ellipse(22, 38, 14, 5, 0, 0, Math.PI * 2);
+    cshCtx.fill();
+    // Royal Purple Kurta
+    cshCtx.fillStyle = '#6a1b9a';
+    cshCtx.beginPath();
+    cshCtx.roundRect(12, 16, 20, 20, 5);
+    cshCtx.fill();
+    // Golden stole
+    cshCtx.fillStyle = '#ffd54f';
+    cshCtx.fillRect(14, 18, 4, 18);
+    cshCtx.fillRect(26, 18, 4, 18);
+    // Head
+    cshCtx.fillStyle = '#ffcc80';
+    cshCtx.beginPath();
+    cshCtx.arc(22, 12, 7, 0, Math.PI * 2);
+    cshCtx.fill();
+    // Purple topi
+    cshCtx.fillStyle = '#4a148c';
+    cshCtx.beginPath();
+    cshCtx.ellipse(22, 8, 7, 3, 0, 0, Math.PI * 2);
+    cshCtx.fill();
+    this.textures.addCanvas('staff_cashier', cashCanvas);
+
     // Counter Station (Teak Counter with Marigold Garland)
     const counterCanvas = document.createElement('canvas');
     counterCanvas.width = 120;

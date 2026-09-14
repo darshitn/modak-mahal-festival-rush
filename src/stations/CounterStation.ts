@@ -30,12 +30,15 @@ export class CounterStation extends BaseStation {
 
   public onPlayerEnter() {
     this.drawRing(true, 0);
+    this.attemptDepositCarriedBoxes();
   }
 
   public onPlayerStay(delta: number) {
     this.serveCooldown -= delta;
     if (this.serveCooldown <= 0) {
-      // Automatic deposit of extra boxes or serving directly handled in ShopScene
+      // Depositing even an incomplete order frees the player's hands so they
+      // can continue producing the remaining boxes.
+      this.attemptDepositCarriedBoxes();
       this.serveCooldown = 350;
     }
   }
@@ -56,6 +59,19 @@ export class CounterStation extends BaseStation {
       return true;
     }
     return false;
+  }
+
+  public attemptDepositCarriedBoxes(): boolean {
+    const deposited = this.gameState.depositBoxesToCounter();
+    if (deposited) {
+      this.scene.tweens.add({
+        targets: this.mainSprite,
+        scaleY: 1.1,
+        duration: 120,
+        yoyo: true
+      });
+    }
+    return deposited;
   }
 
   private showCoinPop(x: number, y: number, amount: number) {
