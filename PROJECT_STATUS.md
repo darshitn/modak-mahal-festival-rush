@@ -58,8 +58,8 @@ This is the active assignment following the single-writer protocol in ANTIGRAVIT
 
 ## Working-tree checkpoint
 
-- Commit: Milestone 1 checkpoint
-- Changed files: Core scaffolding, game scenes, stations, entities, tests, docs
+- Commit: 6fd93c4 (Milestone 1 checkpoint)
+- Changed files: none (clean working tree)
 - Running mutating commands: none
 
 ## Last handoff outcome
