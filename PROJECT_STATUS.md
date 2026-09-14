@@ -72,8 +72,8 @@ This is the active coordination state following the single-writer protocol in AN
 
 ## Working-tree checkpoint
 
-- Commit: Ready for M2 git commit checkpoint
-- Changed files: Core game scenes, entities, stations, tests, docs
+- Commit: 90b68cf (Milestone 2 checkpoint)
+- Changed files: none (clean working tree)
 - Running mutating commands: none
 
 ## Last handoff outcome
