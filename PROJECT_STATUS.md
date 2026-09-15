@@ -76,8 +76,8 @@ This is the active coordination state following the single-writer protocol in AN
 
 ## Working-tree checkpoint
 
-- Commit: (pending M2 checkpoint commit)
-- Changed files: `MODEL_HANDOFF.md`, `PROJECT_STATUS.md`, `TASKS.md`, `src/entities/Player.ts`, `src/scenes/BootScene.ts`, `src/scenes/UIScene.ts`, `src/state/GameState.ts`, `src/stations/IngredientStation.ts`, `src/stations/SteamerStation.ts`, `src/stations/UpgradeStation.ts`, `src/tests/economy.test.ts`
+- Commit: 2431452 (Milestone 2 completed & verified checkpoint)
+- Changed files: none (working tree clean)
 - Running mutating commands: none
 
 ## Last handoff outcome
