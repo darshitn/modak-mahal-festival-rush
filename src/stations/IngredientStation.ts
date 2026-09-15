@@ -7,7 +7,11 @@ export class IngredientStation extends BaseStation {
   private buyButtonContainer: Phaser.GameObjects.Container;
   private buyButtonBg: Phaser.GameObjects.Graphics;
   private buyButtonText: Phaser.GameObjects.Text;
+  private returnButtonContainer: Phaser.GameObjects.Container;
+  private returnButtonBg: Phaser.GameObjects.Graphics;
+  private returnButtonText: Phaser.GameObjects.Text;
   private transferCooldown = 0;
+  private suppressAutoPickupUntilExit = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, gameState: GameState) {
     super(scene, x, y, 'station_ingredient', 'Ingredient Shelf', gameState, 58);
@@ -45,8 +49,31 @@ export class IngredientStation extends BaseStation {
     this.add(this.buyButtonContainer);
     this.buyButtonContainer.setVisible(false);
 
+    // Explicit escape hatch for the upgraded carry-capacity flow. A player
+    // holding an extra bundle must be able to free their hands before taking a
+    // cooked batch from a ready steamer.
+    this.returnButtonContainer = scene.add.container(0, 64);
+    this.returnButtonBg = scene.add.graphics();
+    this.returnButtonText = scene.add.text(0, 0, 'Return Ingredients [R]', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '11px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    });
+    this.returnButtonText.setOrigin(0.5);
+    this.returnButtonContainer.add([this.returnButtonBg, this.returnButtonText]);
+    this.returnButtonContainer.setSize(132, 28);
+    this.returnButtonContainer.setInteractive({ useHandCursor: true });
+    this.returnButtonContainer.on('pointerdown', () => this.attemptReturn());
+    this.add(this.returnButtonContainer);
+    this.returnButtonContainer.setVisible(false);
+
     // Keyboard shortcut (Space / E / Enter)
     scene.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (this.isPlayerInside && event.code === 'KeyR') {
+        this.attemptReturn();
+        return;
+      }
       if (this.isPlayerInside && (event.code === 'Space' || event.code === 'KeyE' || event.code === 'Enter')) {
         this.attemptBuy();
       }
@@ -67,18 +94,30 @@ export class IngredientStation extends BaseStation {
     this.buyButtonBg.lineStyle(2, canAfford ? 0xa5d6a7 : 0xbdbdbd, 1);
     this.buyButtonBg.strokeRoundedRect(-45, -14, 90, 28, 6);
     this.buyButtonText.setText(`Buy ₹${this.gameState.config.bundleCost} [E]`);
+
+    const canReturn = this.isPlayerInside && this.gameState.carried.type === 'bundle';
+    this.returnButtonContainer.setVisible(canReturn);
+    this.returnButtonBg.clear();
+    this.returnButtonBg.fillStyle(0x1565c0, 0.95);
+    this.returnButtonBg.fillRoundedRect(-66, -14, 132, 28, 6);
+    this.returnButtonBg.lineStyle(2, 0x90caf9, 1);
+    this.returnButtonBg.strokeRoundedRect(-66, -14, 132, 28, 6);
   }
 
   public onPlayerEnter() {
+    this.suppressAutoPickupUntilExit = false;
     this.drawRing(true, 0);
     this.buyButtonContainer.setVisible(true);
     this.attemptPickup();
+    this.updateStockDisplay();
   }
 
   public onPlayerStay(delta: number) {
     this.transferCooldown -= delta;
     if (this.transferCooldown <= 0) {
-      this.attemptPickup();
+      if (!this.suppressAutoPickupUntilExit) {
+        this.attemptPickup();
+      }
       this.transferCooldown = 400; // 0.4s cooldown between pickups
     }
   }
@@ -86,6 +125,8 @@ export class IngredientStation extends BaseStation {
   public onPlayerExit() {
     this.drawRing(false, 0);
     this.buyButtonContainer.setVisible(false);
+    this.returnButtonContainer.setVisible(false);
+    this.suppressAutoPickupUntilExit = false;
   }
 
   private attemptBuy() {
@@ -102,6 +143,8 @@ export class IngredientStation extends BaseStation {
   }
 
   private attemptPickup() {
+    if (this.suppressAutoPickupUntilExit) return;
+
     // If player has empty hands or holds bundles and shelf has stock, pick up
     if (this.gameState.ingredientStorageBundles > 0) {
       if (this.gameState.pickupBundle()) {
@@ -112,6 +155,22 @@ export class IngredientStation extends BaseStation {
           yoyo: true
         });
       }
+    }
+  }
+
+  private attemptReturn() {
+    if (this.gameState.returnBundleToStorage()) {
+      // The state notification fires during the return. Set this guard after
+      // the mutation so the next proximity update cannot reclaim the bundle.
+      this.suppressAutoPickupUntilExit = true;
+      this.returnButtonContainer.setVisible(false);
+      this.transferCooldown = 400;
+      this.scene.tweens.add({
+        targets: this.mainSprite,
+        scaleY: 1.12,
+        duration: 120,
+        yoyo: true
+      });
     }
   }
 }

@@ -16,6 +16,7 @@ export class Player extends Phaser.GameObjects.Container {
   };
   public speed = 190;
   public isMoving = false;
+  public isInputBlocked = false;
   private walkTime = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, gameState: GameState) {
@@ -51,6 +52,12 @@ export class Player extends Phaser.GameObjects.Container {
   }
 
   public update(delta: number) {
+    if (this.isInputBlocked) {
+      this.isMoving = false;
+      this.sprite.y = 0;
+      return;
+    }
+
     let vx = 0;
     let vy = 0;
 

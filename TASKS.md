@@ -31,17 +31,24 @@
 - [x] **M2.1 Customer Queue Expansion**
   - [x] Implement multi-customer queuing (up to 4 customers in queue)
   - [x] Introduce customer queue pathing and 2-box orders
-- [x] **M2.2 Upgrade Kiosk**
-  - [x] Implement `UpgradeStation` with proximity UI for purchasing unlocks
+- [x] **M2.2 Upgrade Kiosk & Overlay System**
+  - [x] Implement `UpgradeStation` with proximity trigger and kiosk visuals
+  - [x] Build centered screen-bounded upgrade overlay in `UIScene` rendering above HUD with full input isolation
+  - [x] Implement Close button and `Escape` key shortcut, and prevent background movement during modal
   - [x] Add Carrying Capacity upgrade (30 coins -> 2 batches / 6 boxes)
   - [x] Add Second Steamer unlock (90 coins -> unlocks Steamer 2)
   - [x] Strictly preserve 12-coin working-capital reserve on all purchases
-- [x] **M2.3 Staff Automation**
+  - [x] Ensure all 4 upgrade rows are fully visible and readable without screen clipping
+- [x] **M2.3 Staff Automation & Softlock Protections**
   - [x] Implement Packer NPC (45 coins) stationed at packing table (faster auto-packing)
   - [x] Implement Cashier NPC (60 coins) stationed at counter to auto-serve from counter shelf
   - [x] Implement visible locked vs active states for staff and equipment
+  - [x] HANDOFF-001: Counter box deposit and pooled order fulfillment to prevent partial order deadlock
+  - [x] HANDOFF-002: Ingredient return control at shelf, auto-pickup suppression on return, and blocked collection hint
 - [x] **M2.4 Milestone 2 Verification**
   - [x] Verify upgrades charge once, staff automate workflows without duping items, and build succeeds
+  - [x] Verify upgraded loop end-to-end in browser (11-step sequence covering return, collection, packing, selling, and counter deposit)
+  - [x] Verify centered upgrade overlay in browser: centered, screen-bounded, Escape/Close, input isolation, and all 4 rows visible
 
 ---
 

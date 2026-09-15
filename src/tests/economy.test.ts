@@ -264,5 +264,42 @@ describe('Modak Mahal Economy & State Loop (M1)', () => {
       expect(state.steamers[0].state).toBe('ready');
       expect(state.steamers[1].state).toBe('ready');
     });
+
+    it('completes the upgraded loop after returning an extra carried bundle', () => {
+      const state = new GameState({ startingCash: 42, startingBundles: 2 });
+
+      expect(state.buyCarryUpgrade()).toBe(true);
+      expect(state.coins).toBe(12);
+      expect(state.pickupBundle()).toBe(true);
+      expect(state.pickupBundle()).toBe(true);
+      expect(state.carried).toEqual({ type: 'bundle', count: 2 });
+
+      expect(state.loadSteamer(0)).toBe(true);
+      expect(state.carried).toEqual({ type: 'bundle', count: 1 });
+      state.updateSteamers(state.config.steamTimeSeconds + 0.1);
+      expect(state.steamers[0].state).toBe('ready');
+
+      // A cooked batch cannot mix with the remaining ingredient bundle.
+      expect(state.collectBatchFromSteamer(0)).toBe(false);
+      expect(state.getCurrentObjective().text).toContain('return them at the Shelf');
+
+      expect(state.returnBundleToStorage()).toBe(true);
+      expect(state.carried).toEqual({ type: null, count: 0 });
+      expect(state.ingredientStorageBundles).toBe(1);
+
+      expect(state.collectBatchFromSteamer(0)).toBe(true);
+      expect(state.carried).toEqual({ type: 'batch', count: 1 });
+      expect(state.loadPackingTable()).toBe(true);
+      state.updatePackingTable(state.config.packingTimeSeconds + 0.1, true);
+      expect(state.packingTable.outputBoxes).toBe(3);
+
+      expect(state.collectBoxesFromPackingTable()).toBe(true);
+      expect(state.serveCustomer(3)).toEqual({ success: true, coinsEarned: 30 });
+      expect(state.coins).toBe(42);
+      expect(state.carried).toEqual({ type: null, count: 0 });
+      expect(state.counterBoxesStock).toBe(0);
+      expect(state.stats.totalBoxesSold).toBe(3);
+      expect(state.stats.totalRevenue).toBe(30);
+    });
   });
 });

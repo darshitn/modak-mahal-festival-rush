@@ -411,6 +411,14 @@ export class GameState {
     if (this.ingredientStorageBundles === 0 && this.carried.type !== 'bundle' && this.steamers.every(s => s.state === 'idle')) {
       return { key: 'BUY_INGREDIENT', text: 'Step on the Ingredient Shelf to buy ingredients (12 coins)' };
     }
+    const hasReadySteamer = this.steamers.some(s => s.unlocked && s.state === 'ready');
+    const hasIdleSteamer = this.steamers.some(s => s.unlocked && s.state === 'idle');
+    if (this.carried.type === 'bundle' && hasReadySteamer && !hasIdleSteamer) {
+      return {
+        key: 'COLLECT_MODAKS',
+        text: 'Hands full of ingredients — return them at the Shelf to collect cooked modaks'
+      };
+    }
     if (this.carried.type === 'bundle') {
       return { key: 'LOAD_STEAMER', text: 'Carry the ingredient bundle to the Steamer' };
     }

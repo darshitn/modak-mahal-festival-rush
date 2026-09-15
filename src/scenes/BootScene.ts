@@ -16,7 +16,6 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     this.scene.start('ShopScene');
-    this.scene.start('UIScene');
   }
 
   private createPlayerTexture() {

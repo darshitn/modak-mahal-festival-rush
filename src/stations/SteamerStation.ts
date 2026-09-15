@@ -93,8 +93,13 @@ export class SteamerStation extends BaseStation {
       this.statusText.setStyle({ color: '#ffcc80', backgroundColor: '#e65100' });
       this.cookedPlateSprite.setVisible(false);
     } else if (steamer.state === 'ready') {
-      this.statusText.setText('READY! (Take)');
-      this.statusText.setStyle({ color: '#ffffff', backgroundColor: '#2e7d32' });
+      if (this.gameState.carried.type === 'bundle') {
+        this.statusText.setText('Hands full — Return at Shelf [R]');
+        this.statusText.setStyle({ color: '#ffffff', backgroundColor: '#c62828' });
+      } else {
+        this.statusText.setText('READY! (Take)');
+        this.statusText.setStyle({ color: '#ffffff', backgroundColor: '#2e7d32' });
+      }
       this.cookedPlateSprite.setVisible(true);
     }
   }
