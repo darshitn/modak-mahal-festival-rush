@@ -1,22 +1,22 @@
 # Modak Mahal — project status
 
-Updated: 2026-09-20 (Final Submission Audit and GitHub Release — GEMINI_ACTIVE)
+Updated: 2026-09-20 (Final Submission Audit and GitHub Release — GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED)
 
 ## Ownership
 
-- State: GEMINI_ACTIVE
-- Owner: GEMINI
+- State: WAITING_FOR_REVIEW
+- Owner: none
 - Next owner: none
-- Active handoff: FINAL_SUBMISSION_AUDIT_AND_GITHUB_RELEASE
+- Active handoff: GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED
 
 This is the active coordination state following the single-writer protocol in ANTIGRAVITY_START_HERE.md. Update this file before transferring ownership. Never infer completion from elapsed time.
 
 ## Current milestone
 
 - Milestone: Final Submission Audit and GitHub Release (FINAL_SUBMISSION_AUDIT_AND_GITHUB_RELEASE)
-- Status: IN_PROGRESS — GEMINI_ACTIVE
+- Status: COMPLETED — WAITING_FOR_USER_ACTION (Pages source must be set to GitHub Actions)
 - Previous milestone: Staff, Upgrade and Alignment Polish (STAFF_UPGRADE_AND_ALIGNMENT_POLISH_COMPLETE)
-- Next action: Phase 1 read-only audit, then GitHub Pages config, README rewrite, build and push.
+- Next action: USER must go to https://github.com/darshitn/modak-mahal-festival-rush/settings/pages and set Source to GitHub Actions. Then re-run the workflow.
 
 ## Completed
 

@@ -1589,6 +1589,98 @@ To provide crystal-clear objective clarity for new players and enhance the visua
   - Owner: `none`
   - Active handoff: `LEGACY_STAFF_CHARACTER_ROLLBACK_COMPLETE`
 
+---
+
+## Pass Completion: FINAL_SUBMISSION_AUDIT_AND_GITHUB_RELEASE
+
+**Date**: 2026-09-20
+**Active Handoff**: `GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED`
+**Owner**: `none` (Released to `WAITING_FOR_REVIEW`)
+
+### 1. Phase 1 — Read-Only Audit Results
+
+- **Git state**: 6 previous commits on `master`. All campaign, visual integration, controls, patience/ratings, upgrades, staff, dispatch, victory, UI cleanup work was present in the uncommitted working tree.
+- **Secrets audit**: Zero `.env`, API key, password, or credential files found in the working tree.
+- **Asset audit**: All 11 raster assets referenced in `BootScene.ts` preload exist at the correct paths in `public/assets/generated/`. Path casing confirmed.
+  - `bg_hall_illustrated-v3-clean.png` ✓
+  - `pandal_ganesha-v2.png` ✓
+  - `steamer_brass-v1.png` ✓
+  - `steamer_input_table-v1.png` ✓
+  - `steamer_output_table-v1.png` ✓
+  - `station_supply_shelf-v1.png` ✓ (rollback, preloaded but not used at runtime)
+  - `station_supply_shelf-v2.png` ✓
+  - `station_upgrade_desk-v1.png` ✓
+  - `station_packing_bench-v1.png` ✓
+  - `station_service_counter-v1.png` ✓
+  - `modak_platter-v1.png` ✓
+- **Staff textures**: `staff_packer` and `staff_cashier` confirmed as procedural canvas textures generated in `BootScene.ts` (legacy character rollback is in effect — raster `staff_packer-v1.png` / `staff_cashier-v1.png` are NOT preloaded).
+- **No scratch scripts, browser profiles, or Antigravity brain data** found in the project tree.
+- **Tests**: 65/65 passing (3 test files: economy, campaign, customerService).
+- **Production build**: Exit code 0. Bundle: `dist/assets/index-DDJBY0-S.js` (1605 kB).
+
+### 2. Phase 2 — .gitignore Update
+
+Added to `.gitignore`:
+- `.env`, `.env.*`, `!.env.example`
+- `scratch/`
+- `*.log`
+- `coverage/`
+- `playwright-report/`
+- `test-results/`
+
+### 3. Phase 3 — GitHub Pages Configuration
+
+- Updated `vite.config.ts` with `base: '/modak-mahal-festival-rush/'`.
+- `dist/index.html` line 41 confirmed: `src="/modak-mahal-festival-rush/assets/index-DDJBY0-S.js"` — correct subdirectory base.
+- Created `.github/workflows/deploy-pages.yml`:
+  - Triggers on `push` to `master` and `workflow_dispatch`.
+  - Permissions: `contents: read`, `pages: write`, `id-token: write`.
+  - Concurrency group: `pages`.
+  - Steps: `checkout@v4` → `setup-node@v4` (Node 20) → `npm ci` → `vitest run` → `vite build` → `configure-pages@v5` → `upload-pages-artifact@v3` (path: `dist`) → `deploy-pages@v4`.
+
+### 4. Phase 4 — README Rewrite
+
+Rewrote `README.md` with:
+- Game description, gameplay loop, controls table.
+- Customer patience system with star ratings and tip amounts.
+- Four upgrade table with costs and effects.
+- Victory condition, Continue Growing, pause behavior, timeout.
+- Desktop and mobile support statement.
+- Local installation commands (`npm ci`, `npm run dev`, `npm test -- --run`, `npm run build`, `npm run preview`).
+- Technology stack table.
+- Asset credits link to `ASSET_CREDITS.md`.
+- AI-assisted development disclosure (without claiming organizer permission).
+- Known limitations (no local save, no audio, locked first floor).
+- Submission checklist with user-action placeholders for demo video, team details, and AI-policy confirmation.
+
+### 5. Phase 5 — Build Verification
+
+- `npm install` (used instead of `npm ci` due to `esbuild.exe` being locked by running Vite dev server; same lockfile).
+- `.\node_modules\.bin\vitest run --run`: **65/65 passed**.
+- `.\node_modules\.bin\tsc && .\node_modules\.bin\vite build`: **Exit code 0**.
+- `dist/index.html` asset URL verified: uses `/modak-mahal-festival-rush/` base prefix correctly.
+
+### 6. Phase 7 — Git Commit and Push
+
+- Staged 64 files (all source, assets, docs, workflow, no `node_modules` or `dist`).
+- Release commit: `297b162c28caeb5da37c8da54e1122c190dd66f8`.
+- Remote added: `https://github.com/darshitn/modak-mahal-festival-rush.git`.
+- Push result: `* [new branch] master -> master` — **confirmed successful**.
+
+### 7. Phase 8 — Pages Deployment Status
+
+- The GitHub Actions workflow was triggered by the push.
+- **User action required**: Navigate to `https://github.com/darshitn/modak-mahal-festival-rush/settings/pages` and set **Source** to **GitHub Actions**. Without this setting, the workflow will not be permitted to publish to Pages.
+- After setting the source, re-run the workflow via the Actions tab or push a new commit.
+- Live URL (once Pages is configured): `https://darshitn.github.io/modak-mahal-festival-rush/`
+
+### 8. Final Ownership State
+
+- State: `WAITING_FOR_REVIEW`
+- Owner: `none`
+- Active handoff: `GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED`
+
+
 
 
 
