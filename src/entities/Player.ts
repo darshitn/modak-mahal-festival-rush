@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../state/GameState.ts';
 import { ItemType } from '../types/index.ts';
+import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
 
 export class Player extends Phaser.GameObjects.Container {
   public sprite: Phaser.GameObjects.Sprite;
@@ -31,6 +32,7 @@ export class Player extends Phaser.GameObjects.Container {
 
     // Main sprite
     this.sprite = scene.add.sprite(0, 0, 'player');
+    this.sprite.setScale(0.5);
     this.add(this.sprite);
 
     // Setup input keys
@@ -49,6 +51,23 @@ export class Player extends Phaser.GameObjects.Container {
     this.updateCarriedStack();
 
     scene.add.existing(this);
+  }
+
+  public clearMovementInput() {
+    this.isMoving = false;
+    this.sprite.y = 0;
+    if (this.cursors) {
+      this.cursors.left.reset();
+      this.cursors.right.reset();
+      this.cursors.up.reset();
+      this.cursors.down.reset();
+    }
+    if (this.wasd) {
+      this.wasd.left.reset();
+      this.wasd.right.reset();
+      this.wasd.up.reset();
+      this.wasd.down.reset();
+    }
   }
 
   public update(delta: number) {
@@ -78,9 +97,12 @@ export class Player extends Phaser.GameObjects.Container {
     this.x += vx * this.speed * dt;
     this.y += vy * this.speed * dt;
 
-    // Keep within shop boundary
-    this.x = Phaser.Math.Clamp(this.x, 80, 880);
-    this.y = Phaser.Math.Clamp(this.y, 100, 480);
+    // Keep within world boundary derived from world dimensions and feet footprint
+    // Physical wall collisions are governed by ShopScene collision map
+    const FOOT_OFFSET_Y = 15;
+    const FOOT_RADIUS = 8.5;
+    this.x = Phaser.Math.Clamp(this.x, FOOT_RADIUS, LOGICAL_WIDTH - FOOT_RADIUS);
+    this.y = Phaser.Math.Clamp(this.y, 0, LOGICAL_HEIGHT - FOOT_OFFSET_Y - FOOT_RADIUS);
 
     this.isMoving = vx !== 0 || vy !== 0;
 
@@ -115,8 +137,8 @@ export class Player extends Phaser.GameObjects.Container {
     const spacing = carried.type === 'box' ? 12 : 16;
 
     for (let i = 0; i < carried.count; i++) {
-      const itemSprite = this.scene.add.sprite(0, -22 - i * spacing, textureKey);
-      itemSprite.setScale(0.85);
+      const itemSprite = this.scene.add.sprite(0, -28 - i * spacing, textureKey);
+      itemSprite.setScale(0.44);
       this.add(itemSprite);
       this.stackSprites.push(itemSprite);
     }
@@ -131,7 +153,7 @@ export class Player extends Phaser.GameObjects.Container {
     for (let i = 0; i < this.stackSprites.length; i++) {
       const spr = this.stackSprites[i];
       spr.x = sway * (i + 1) * 0.4;
-      spr.y = this.sprite.y - 22 - i * spacing;
+      spr.y = this.sprite.y - 28 - i * spacing;
     }
   }
 

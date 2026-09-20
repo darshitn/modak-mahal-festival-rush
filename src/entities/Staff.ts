@@ -19,16 +19,18 @@ export class PackerNPC extends Phaser.GameObjects.Container {
     this.add(this.shadow);
 
     this.sprite = scene.add.sprite(0, 0, 'staff_packer');
+    this.sprite.setScale(0.5);
     this.add(this.sprite);
 
-    this.statusText = scene.add.text(0, -28, 'Packer (Helper)', {
+    this.statusText = scene.add.text(0, -28, 'Packer', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '10px',
-      color: '#a5d6a7',
+      color: '#fff8e1',
       backgroundColor: '#1b5e20',
-      padding: { x: 4, y: 1 }
+      fontStyle: 'bold',
+      padding: { x: 5, y: 2 }
     });
-    this.statusText.setOrigin(0.5);
+    this.statusText.setOrigin(0.5).setResolution(2);
     this.add(this.statusText);
 
     scene.add.existing(this);
@@ -71,16 +73,18 @@ export class CashierNPC extends Phaser.GameObjects.Container {
     this.add(this.shadow);
 
     this.sprite = scene.add.sprite(0, 0, 'staff_cashier');
+    this.sprite.setScale(0.5);
     this.add(this.sprite);
 
-    this.statusText = scene.add.text(0, -28, 'Cashier (Helper)', {
+    this.statusText = scene.add.text(0, -28, 'Cashier', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '10px',
-      color: '#e1bee7',
+      color: '#fff8e1',
       backgroundColor: '#4a148c',
-      padding: { x: 4, y: 1 }
+      fontStyle: 'bold',
+      padding: { x: 5, y: 2 }
     });
-    this.statusText.setOrigin(0.5);
+    this.statusText.setOrigin(0.5).setResolution(2);
     this.add(this.statusText);
 
     scene.add.existing(this);
@@ -93,21 +97,27 @@ export class CashierNPC extends Phaser.GameObjects.Container {
     if (!this.visible) return;
 
     this.autoServeCooldown -= delta;
-    if (this.autoServeCooldown <= 0 && frontCustomer && frontCustomer.state === 'waiting') {
+    if (this.autoServeCooldown <= 0 && frontCustomer && frontCustomer.state === 'waiting' && !frontCustomer.isServing) {
       if (this.gameState.counterBoxesStock >= frontCustomer.requestedBoxes) {
-        const res = this.gameState.autoServeWithCashier(frontCustomer.requestedBoxes);
+        frontCustomer.isServing = true;
+        const res = this.gameState.autoServeWithCashier(
+          frontCustomer.requestedBoxes,
+          frontCustomer.getPatienceFraction()
+        );
         if (res.success) {
-          frontCustomer.markServed();
-          this.showCoinPop(this.x + 30, this.y, res.coinsEarned);
+          frontCustomer.markServed(res.feedbackText, res.stars, res.coinsEarned, res.tipEarned);
+          this.scene.events.emit('customer-sale-completed', res);
 
-          // Namaste bow animation
+          // Namaste bow animation using the legacy character's base scale.
           this.scene.tweens.add({
             targets: this.sprite,
-            scaleY: 0.85,
+            scaleY: 0.42,
             duration: 180,
             yoyo: true
           });
           this.autoServeCooldown = 500;
+        } else {
+          frontCustomer.isServing = false;
         }
       }
     }
@@ -115,33 +125,5 @@ export class CashierNPC extends Phaser.GameObjects.Container {
 
   private updateVisibility() {
     this.setVisible(this.gameState.upgrades.hasCashier);
-  }
-
-  private showCoinPop(x: number, y: number, amount: number) {
-    const coinContainer = this.scene.add.container(x, y);
-    const coinSprite = this.scene.add.sprite(-16, 0, 'coin');
-    coinSprite.setScale(0.9);
-
-    const txt = this.scene.add.text(4, 0, `+${amount} (Cashier)`, {
-      fontFamily: 'Outfit, sans-serif',
-      fontSize: '14px',
-      color: '#ffd54f',
-      stroke: '#3e2723',
-      strokeThickness: 3,
-      fontStyle: 'bold'
-    });
-    txt.setOrigin(0, 0.5);
-
-    coinContainer.add([coinSprite, txt]);
-    coinContainer.setDepth(1000);
-
-    this.scene.tweens.add({
-      targets: coinContainer,
-      y: y - 50,
-      alpha: 0,
-      duration: 1000,
-      ease: 'Power2',
-      onComplete: () => coinContainer.destroy()
-    });
   }
 }

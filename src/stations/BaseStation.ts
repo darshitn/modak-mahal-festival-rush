@@ -32,18 +32,19 @@ export abstract class BaseStation extends Phaser.GameObjects.Container {
 
     // Station sprite
     this.mainSprite = scene.add.sprite(0, 0, textureKey);
+    this.mainSprite.setScale(0.5);
     this.add(this.mainSprite);
 
     // Station label
     this.labelText = scene.add.text(0, -36, stationName, {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '13px',
-      color: '#ffecb3',
-      stroke: '#3e2723',
-      strokeThickness: 3,
+      color: '#45362e',
+      stroke: '#fffdf7',
+      strokeThickness: 4,
       align: 'center'
     });
-    this.labelText.setOrigin(0.5);
+    this.labelText.setOrigin(0.5).setResolution(2);
     this.add(this.labelText);
 
     this.drawRing(false, 0);
@@ -72,13 +73,17 @@ export abstract class BaseStation extends Phaser.GameObjects.Container {
   protected drawRing(active: boolean, progress = 0, ringColor = 0xffb300) {
     this.ringGraphics.clear();
 
-    // Base circle boundary
-    this.ringGraphics.lineStyle(2, active ? 0xffd54f : 0x795548, active ? 0.85 : 0.35);
+    if (!active && progress <= 0) {
+      return;
+    }
+
+    // Only the active station is highlighted; inactive circles add clutter.
+    this.ringGraphics.lineStyle(2, active ? 0xe99527 : 0xc9953d, active ? 0.9 : 0.55);
     this.ringGraphics.strokeCircle(0, 10, this.interactionRadius);
 
     // Background fill when active
     if (active) {
-      this.ringGraphics.fillStyle(0xffd54f, 0.12);
+      this.ringGraphics.fillStyle(0xe99527, 0.1);
       this.ringGraphics.fillCircle(0, 10, this.interactionRadius);
     }
 

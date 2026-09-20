@@ -53,18 +53,23 @@
 ---
 
 ## Milestone 3: Complete Festive Campaign, Save & Ending
-- [ ] **M3.1 Campaign Progression & Objectives**
-  - [ ] Implement guided tutorial flow into festival morning rush
-  - [ ] Implement Grand Pandal bulk order contract (12 boxes) with dedicated dispatch crate
-- [ ] **M3.2 Round Timer & Endings**
-  - [ ] Implement round timer (8-10 min) with pause support
-  - [ ] Implement Victory Celebration modal with festival fireworks/garlands and score breakdown
-  - [ ] Implement Timeout/Results modal with retry action
+- [x] **M3.1 Campaign Progression & Objectives**
+  - [x] Implement guided tutorial flow into festival open and morning rush
+  - [x] Implement Grand Pandal bulk order contract (12 boxes) with dedicated dispatch crate
+  - [x] Introduce authoritative CampaignState with 7 explicit stages (ONBOARDING -> FESTIVAL_OPEN -> GROW_BUSINESS -> FESTIVAL_RUSH -> PANDAL_ORDER -> DISPATCHING -> VICTORY / TIME_EXPIRED)
+- [x] **M3.2 Round Timer & Endings**
+  - [x] Implement authoritative simulation round timer (10 min) with delta clamping and pause support
+  - [x] Implement single 75s Festival Rush triggered once on first staff hire with advance announcement
+  - [x] Implement Victory Celebration modal with statistics, award title (4 tiers), and score breakdown
+  - [x] Implement Timeout/Results modal with retry encouragement and restart action
+  - [x] Implement Continue Growing mode preserving immutable snapshot of victory stats
+  - [x] Implement clean Restart Festival without duplicated objects or listeners
 - [ ] **M3.3 Local Persistence**
-  - [ ] Implement `SaveManager` with schema versioning and corruption handling
-  - [ ] Provide Continue and New Game options on startup
-- [ ] **M3.4 Milestone 3 Verification**
-  - [ ] Complete full campaign playthrough, test save/resume, and verify build
+  - [ ] Implement `SaveManager` with schema versioning and corruption handling (deferred per campaign task instructions)
+  - [ ] Provide Continue and New Game options on startup (deferred)
+- [x] **M3.4 Milestone 3 Campaign Verification**
+  - [x] Complete full campaign playthrough in browser, test pause/upgrade freeze, verify victory and timeout screens
+  - [x] 48 passing automated tests (unit and campaign suites) and clean production build
 
 ---
 

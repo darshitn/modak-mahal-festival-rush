@@ -127,6 +127,95 @@ describe('Modak Mahal Economy & State Loop (M1)', () => {
     expect(state.ingredientStorageBundles).toBe(BALANCE.startingBundles);
   });
 
+  it('unloads a two-bundle stack into one steamer and safely chains the queued cook', () => {
+    const state = new GameState({ startingCash: 42, startingBundles: 2 });
+    expect(state.buyCarryUpgrade()).toBe(true);
+    expect(state.pickupBundle()).toBe(true);
+    expect(state.pickupBundle()).toBe(true);
+    expect(state.carried).toEqual({ type: 'bundle', count: 2 });
+
+    // Both bundles leave the player's hands. One begins steaming and one is
+    // visible in the steamer input queue, so the carry upgrade removes trips.
+    expect(state.loadSteamer(0)).toBe(true);
+    expect(state.carried).toEqual({ type: null, count: 0 });
+    expect(state.steamers[0].state).toBe('steaming');
+    expect(state.steamers[0].inputBundles).toBe(1);
+
+    state.updateSteamers(state.config.steamTimeSeconds + 0.1);
+    expect(state.steamers[0].state).toBe('ready');
+    expect(state.steamers[0].hasOutput).toBe(true);
+    expect(state.steamers[0].inputBundles).toBe(1);
+
+    // Taking the tray starts exactly one queued bundle; neither bundle is lost.
+    expect(state.collectBatchFromSteamer(0)).toBe(true);
+    expect(state.carried).toEqual({ type: 'batch', count: 1 });
+    expect(state.steamers[0].state).toBe('steaming');
+    expect(state.steamers[0].inputBundles).toBe(0);
+    expect(state.steamers[0].hasOutput).toBe(false);
+  });
+
+  it('keeps a carried bundle recoverable when every steamer input shelf is full', () => {
+    const state = new GameState({ startingBundles: 0 });
+    state.carried = { type: 'bundle', count: 1 };
+    state.steamers[0].inputBundles = state.config.steamerInputCapacity;
+
+    expect(state.loadSteamer(0)).toBe(false);
+    expect(state.carried).toEqual({ type: 'bundle', count: 1 });
+    expect(state.returnBundleToStorage()).toBe(true);
+    expect(state.ingredientStorageBundles).toBe(1);
+    expect(state.carried).toEqual({ type: null, count: 0 });
+  });
+
+  it('does not consume a batch when the packing output shelf is full', () => {
+    const state = new GameState({ startingBundles: 0 });
+    state.packingTable.inputBatches = 1;
+    state.packingTable.outputBoxes = state.config.packingOutputCapacityBoxes;
+
+    state.updatePackingTable(state.config.packingTimeSeconds * 2, true);
+    expect(state.packingTable.isPacking).toBe(false);
+    expect(state.packingTable.inputBatches).toBe(1);
+    expect(state.packingTable.outputBoxes).toBe(state.config.packingOutputCapacityBoxes);
+
+    // A returned cooked batch still has a receiving area even when the box
+    // shelf is full, and packing resumes safely after boxes are collected.
+    state.carried = { type: 'batch', count: 1 };
+    expect(state.loadPackingTable()).toBe(true);
+    expect(state.packingTable.inputBatches).toBe(2);
+    expect(state.collectBoxesFromPackingTable()).toBe(true);
+    expect(state.packingTable.outputBoxes).toBe(
+      state.config.packingOutputCapacityBoxes - state.config.boxesPerBatch
+    );
+    state.depositBoxesToCounter();
+
+    state.updatePackingTable(state.config.packingTimeSeconds + 0.1, true);
+    expect(state.packingTable.inputBatches).toBe(1);
+    expect(state.packingTable.outputBoxes).toBe(state.config.packingOutputCapacityBoxes);
+  });
+
+  it('finishes a player-started packing job after the player walks away', () => {
+    const state = new GameState({ startingBundles: 0 });
+    state.packingTable.inputBatches = 1;
+
+    state.updatePackingTable(1, true);
+    expect(state.packingTable.isPacking).toBe(true);
+
+    state.updatePackingTable(state.config.packingTimeSeconds, false);
+    expect(state.packingTable.isPacking).toBe(false);
+    expect(state.packingTable.inputBatches).toBe(0);
+    expect(state.packingTable.outputBoxes).toBe(state.config.boxesPerBatch);
+  });
+
+  it('guides the player to wait while an active steamer is cooking', () => {
+    const state = new GameState();
+    expect(state.pickupBundle()).toBe(true);
+    expect(state.loadSteamer(0)).toBe(true);
+
+    expect(state.getCurrentObjective()).toEqual({
+      key: 'WAIT_STEAM',
+      text: 'Waiting for modaks to steam...'
+    });
+  });
+
   it('deposits an incomplete box amount at the counter and frees the player to keep producing', () => {
     const state = new GameState({ startingCash: 0, startingBundles: 1 });
     state.carried = { type: 'box', count: 1 };
@@ -265,7 +354,7 @@ describe('Modak Mahal Economy & State Loop (M1)', () => {
       expect(state.steamers[1].state).toBe('ready');
     });
 
-    it('completes the upgraded loop after returning an extra carried bundle', () => {
+    it('completes the upgraded loop after unloading both carried bundles', () => {
       const state = new GameState({ startingCash: 42, startingBundles: 2 });
 
       expect(state.buyCarryUpgrade()).toBe(true);
@@ -275,20 +364,14 @@ describe('Modak Mahal Economy & State Loop (M1)', () => {
       expect(state.carried).toEqual({ type: 'bundle', count: 2 });
 
       expect(state.loadSteamer(0)).toBe(true);
-      expect(state.carried).toEqual({ type: 'bundle', count: 1 });
+      expect(state.carried).toEqual({ type: null, count: 0 });
+      expect(state.steamers[0].inputBundles).toBe(1);
       state.updateSteamers(state.config.steamTimeSeconds + 0.1);
       expect(state.steamers[0].state).toBe('ready');
 
-      // A cooked batch cannot mix with the remaining ingredient bundle.
-      expect(state.collectBatchFromSteamer(0)).toBe(false);
-      expect(state.getCurrentObjective().text).toContain('return them at the Shelf');
-
-      expect(state.returnBundleToStorage()).toBe(true);
-      expect(state.carried).toEqual({ type: null, count: 0 });
-      expect(state.ingredientStorageBundles).toBe(1);
-
       expect(state.collectBatchFromSteamer(0)).toBe(true);
       expect(state.carried).toEqual({ type: 'batch', count: 1 });
+      expect(state.steamers[0].state).toBe('steaming');
       expect(state.loadPackingTable()).toBe(true);
       state.updatePackingTable(state.config.packingTimeSeconds + 0.1, true);
       expect(state.packingTable.outputBoxes).toBe(3);
