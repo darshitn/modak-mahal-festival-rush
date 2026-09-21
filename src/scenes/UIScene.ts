@@ -3,6 +3,7 @@ import { GameState } from '../state/GameState.ts';
 import { CampaignState } from '../state/CampaignState.ts';
 import { ShopScene } from './ShopScene.ts';
 import { COLORS, LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
+import { calculateJoystickVector, isMobileLayout } from '../utils/mobileControls.ts';
 
 export interface UpgradeModalItem {
   id: 'carry' | 'packer' | 'cashier' | 'steamer2';
@@ -28,6 +29,29 @@ export class UIScene extends Phaser.Scene {
   private mobileSummaryText!: Phaser.GameObjects.Text;
   private desktopHudContainer!: Phaser.GameObjects.Container;
 
+  // Mobile Top Bar Pause Button
+  public mobilePauseBtnContainer!: Phaser.GameObjects.Container;
+  private mobilePauseBg!: Phaser.GameObjects.Graphics;
+  private mobilePauseLabel!: Phaser.GameObjects.Text;
+
+  // Mobile Virtual Joystick
+  public joystickContainer!: Phaser.GameObjects.Container;
+  private joystickBase!: Phaser.GameObjects.Graphics;
+  private joystickKnob!: Phaser.GameObjects.Graphics;
+  private joystickPointerId: number | null = null;
+  private joystickBaseX = 70;
+  private joystickBaseY = 460;
+  private readonly joystickRadius = 46;
+  private readonly joystickKnobRadius = 23;
+  private readonly joystickDeadZone = 8;
+
+  // Mobile Contextual ACTION Button
+  public mobileActionContainer!: Phaser.GameObjects.Container;
+  private mobileActionBg!: Phaser.GameObjects.Graphics;
+  private mobileActionText!: Phaser.GameObjects.Text;
+  private mobileActionSubtext!: Phaser.GameObjects.Text;
+  public isMobileActionActive = false;
+
   // Top Bar elements
   private topBarGraphics!: Phaser.GameObjects.Graphics;
   private coinBgGraphics!: Phaser.GameObjects.Graphics;
@@ -49,6 +73,7 @@ export class UIScene extends Phaser.Scene {
   // Upgrade Modal
   // Modals & Keyboard listener
   private onKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private onWindowBlurHandler: (() => void) | null = null;
   public isUpgradeModalOpen = false;
   private modalContainer!: Phaser.GameObjects.Container;
   private modalDimmer!: Phaser.GameObjects.Graphics;
@@ -69,6 +94,8 @@ export class UIScene extends Phaser.Scene {
   public isGuideModalOpen = false;
   private guideModalContainer!: Phaser.GameObjects.Container;
   public hasShownOpeningGuide = false;
+  private guideControlsText?: Phaser.GameObjects.Text;
+  private guideStartHintText?: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'UIScene' });
@@ -247,6 +274,31 @@ export class UIScene extends Phaser.Scene {
       wordWrap: { width: 360 }
     }).setResolution(2).setDepth(101).setVisible(false);
 
+    // Mobile Top Bar Pause Button (min 44x44 touch hit area)
+    this.mobilePauseBtnContainer = this.add.container(screenW - 48, 7);
+    this.mobilePauseBg = this.add.graphics();
+    this.mobilePauseBg.fillStyle(0xfffdf7, 1);
+    this.mobilePauseBg.fillRoundedRect(0, 0, 42, 38, 8);
+    this.mobilePauseBg.lineStyle(1.5, 0x45362e, 0.65);
+    this.mobilePauseBg.strokeRoundedRect(0, 0, 42, 38, 8);
+
+    this.mobilePauseLabel = this.add.text(21, 19, '❚❚', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '15px',
+      color: '#45362e',
+      fontStyle: 'bold'
+    }).setOrigin(0.5).setResolution(2);
+
+    this.mobilePauseBtnContainer.add([this.mobilePauseBg, this.mobilePauseLabel]);
+    this.mobilePauseBtnContainer.setSize(44, 44);
+    this.mobilePauseBtnContainer.setInteractive({ useHandCursor: true });
+    this.mobilePauseBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation();
+      this.togglePause();
+    });
+    this.mobilePauseBtnContainer.setDepth(5500);
+    this.mobilePauseBtnContainer.setVisible(false);
+
     // Screen-Anchored Action Prompt Card
     this.actionCardContainer = this.add.container(screenW / 2, screenH - 52);
     this.actionCardContainer.setDepth(150);
@@ -261,7 +313,7 @@ export class UIScene extends Phaser.Scene {
     this.actionCardContainer.add([this.actionCardBg, this.actionCardText]);
     this.actionCardContainer.setVisible(false);
 
-    // Controls text
+    // Controls text (desktop only)
     this.controlsText = this.add.text(
       screenW / 2,
       screenH - 20,
@@ -274,6 +326,11 @@ export class UIScene extends Phaser.Scene {
         padding: { x: 12, y: 4 }
       }
     ).setOrigin(0.5).setResolution(2);
+
+    // Build mobile virtual joystick & contextual action controls
+    // Enable multi-pointer tracking so joystick + action button can be used simultaneously
+    this.input.addPointer(2);
+    this.buildMobileControls();
 
     // Build modal overlays
     this.buildUpgradeModal();
@@ -339,11 +396,262 @@ export class UIScene extends Phaser.Scene {
 
   private cleanup() {
     this.cleanupKeyboard();
+    if (this.onWindowBlurHandler) {
+      window.removeEventListener('blur', this.onWindowBlurHandler);
+      this.onWindowBlurHandler = null;
+    }
+    this.resetJoystick();
     this.scale.off(Phaser.Scale.Events.RESIZE, this.updateResponsiveHud, this);
+  }
+
+  public get hasCoarseOrTouch(): boolean {
+    return typeof window !== 'undefined' && (
+      window.matchMedia?.('(pointer: coarse)').matches ||
+      ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0)
+    );
+  }
+
+  public isMobileActive(): boolean {
+    return isMobileLayout(this.scale.gameSize.width, this.scale.gameSize.height, this.hasCoarseOrTouch);
+  }
+
+  public areModalsOpen(): boolean {
+    return (
+      this.isGuideModalOpen ||
+      this.isUpgradeModalOpen ||
+      this.isPauseModalOpen ||
+      this.isResultsModalOpen
+    );
+  }
+
+  public updateControlsVisibility() {
+    const isMobile = this.isMobileActive();
+    const modalsOpen = this.areModalsOpen();
+    const isPlayable = !modalsOpen && !(this.campaignState?.stage === 'VICTORY' || this.campaignState?.stage === 'TIME_EXPIRED');
+
+    if (this.joystickContainer) {
+      this.joystickContainer.setVisible(isMobile && isPlayable);
+    }
+    if (this.mobileActionContainer) {
+      this.mobileActionContainer.setVisible(isMobile && isPlayable && this.isMobileActionActive);
+    }
+    if (this.mobilePauseBtnContainer) {
+      this.mobilePauseBtnContainer.setVisible(isMobile && !this.isResultsModalOpen && !this.isGuideModalOpen && !this.isUpgradeModalOpen);
+    }
+  }
+
+  private buildMobileControls() {
+    // Virtual Joystick container
+    this.joystickContainer = this.add.container(this.joystickBaseX, this.joystickBaseY);
+    this.joystickContainer.setDepth(6000);
+
+    this.joystickBase = this.add.graphics();
+    this.joystickBase.fillStyle(0x2b1d16, 0.55);
+    this.joystickBase.fillCircle(0, 0, this.joystickRadius);
+    this.joystickBase.lineStyle(2, 0xd4a359, 0.85);
+    this.joystickBase.strokeCircle(0, 0, this.joystickRadius);
+    this.joystickBase.lineStyle(1, 0xffd54f, 0.25);
+    this.joystickBase.strokeCircle(0, 0, 16);
+
+    this.joystickKnob = this.add.graphics();
+    this.joystickKnob.fillStyle(0xe99527, 0.9);
+    this.joystickKnob.fillCircle(0, 0, this.joystickKnobRadius);
+    this.joystickKnob.lineStyle(2, 0xffe082, 1);
+    this.joystickKnob.strokeCircle(0, 0, this.joystickKnobRadius);
+    this.joystickKnob.fillStyle(0xfff9c4, 0.7);
+    this.joystickKnob.fillCircle(-4, -4, 6);
+
+    this.joystickContainer.add([this.joystickBase, this.joystickKnob]);
+    this.joystickContainer.setVisible(false);
+
+    // Mobile Contextual ACTION Button
+    this.mobileActionContainer = this.add.container(0, 0);
+    this.mobileActionContainer.setDepth(6000);
+
+    this.mobileActionBg = this.add.graphics();
+    this.mobileActionBg.fillStyle(0x2e7d32, 0.95);
+    this.mobileActionBg.fillCircle(0, 0, 36);
+    this.mobileActionBg.lineStyle(2.5, 0xffd54f, 1);
+    this.mobileActionBg.strokeCircle(0, 0, 36);
+
+    this.mobileActionText = this.add.text(0, -6, 'BUY', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '13px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+      align: 'center'
+    }).setOrigin(0.5).setResolution(2);
+
+    this.mobileActionSubtext = this.add.text(0, 10, '₹12', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '9.5px',
+      color: '#ffd54f',
+      fontStyle: 'bold',
+      align: 'center'
+    }).setOrigin(0.5).setResolution(2);
+
+    this.mobileActionContainer.add([
+      this.mobileActionBg,
+      this.mobileActionText,
+      this.mobileActionSubtext
+    ]);
+    this.mobileActionContainer.setSize(72, 72);
+    this.mobileActionContainer.setInteractive({ useHandCursor: true });
+    this.mobileActionContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation();
+      this.handleMobileAction();
+    });
+    this.mobileActionContainer.setVisible(false);
+
+    // Pointer event listeners for joystick tracking
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isMobileActive() || this.areModalsOpen()) return;
+      const dist = Math.hypot(pointer.x - this.joystickBaseX, pointer.y - this.joystickBaseY);
+      if (dist <= 65 && this.joystickPointerId === null) {
+        this.joystickPointerId = pointer.id;
+        this.updateJoystickPosition(pointer.x, pointer.y);
+      }
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.joystickPointerId === pointer.id) {
+        this.updateJoystickPosition(pointer.x, pointer.y);
+      }
+    });
+
+    const resetIfJoystick = (pointer: Phaser.Input.Pointer) => {
+      if (this.joystickPointerId === pointer.id) {
+        this.resetJoystick();
+      }
+    };
+
+    this.input.on('pointerup', resetIfJoystick);
+    this.input.on('pointerupoutside', resetIfJoystick);
+    this.input.on('gameout', () => this.resetJoystick());
+
+    this.onWindowBlurHandler = () => this.resetJoystick();
+    window.addEventListener('blur', this.onWindowBlurHandler);
+  }
+
+  private updateJoystickPosition(px: number, py: number) {
+    const dx = px - this.joystickBaseX;
+    const dy = py - this.joystickBaseY;
+    const vec = calculateJoystickVector(dx, dy, this.joystickRadius, this.joystickDeadZone);
+
+    this.joystickKnob.setPosition(vec.knobX, vec.knobY);
+
+    const shop = this.scene.get('ShopScene') as ShopScene;
+    if (shop?.player && !shop.player.isInputBlocked && !this.areModalsOpen()) {
+      shop.player.setVirtualMovement(vec.x, vec.y);
+    }
+  }
+
+  public resetJoystick() {
+    this.joystickPointerId = null;
+    if (this.joystickKnob) {
+      this.joystickKnob.setPosition(0, 0);
+    }
+    const shop = this.scene.get('ShopScene') as ShopScene;
+    if (shop?.player) {
+      shop.player.clearVirtualMovement();
+    }
+  }
+
+  public handleMobileAction() {
+    if (!this.isMobileActive() || this.areModalsOpen()) return;
+    const shop = this.scene.get('ShopScene') as ShopScene;
+    if (!shop) return;
+
+    if (shop.ingredientStation?.isPlayerInside) {
+      if (this.gameState.carried.type === 'bundle') {
+        shop.ingredientStation.attemptReturn();
+      } else {
+        shop.ingredientStation.attemptBuy();
+      }
+      this.pulseActionButton();
+      return;
+    }
+
+    if (shop.upgradeStation?.isPlayerInside) {
+      shop.upgradeStation.openModal();
+      this.pulseActionButton();
+      return;
+    }
+  }
+
+  private pulseActionButton() {
+    this.tweens.add({
+      targets: this.mobileActionContainer,
+      scale: 0.9,
+      duration: 60,
+      yoyo: true
+    });
+  }
+
+  private updateMobileActionState() {
+    if (!this.mobileActionContainer) return;
+    const isMobile = this.isMobileActive();
+    const modalsOpen = this.areModalsOpen();
+    const isPlayable = !modalsOpen && !(this.campaignState?.stage === 'VICTORY' || this.campaignState?.stage === 'TIME_EXPIRED');
+
+    if (!isMobile || !isPlayable) {
+      this.isMobileActionActive = false;
+      this.mobileActionContainer.setVisible(false);
+      return;
+    }
+
+    const shop = this.scene.get('ShopScene') as ShopScene;
+    if (!shop) {
+      this.isMobileActionActive = false;
+      this.mobileActionContainer.setVisible(false);
+      return;
+    }
+
+    let label = '';
+    let sublabel = '';
+    let bgColor = 0x2e7d32;
+    let enabled = true;
+
+    if (shop.ingredientStation?.isPlayerInside) {
+      const hasBundle = this.gameState.carried.type === 'bundle';
+      if (hasBundle) {
+        label = 'RETURN';
+        sublabel = 'SHELF';
+        bgColor = 0x1565c0;
+      } else {
+        const canAfford = this.gameState.coins >= this.gameState.config.bundleCost;
+        label = 'BUY';
+        sublabel = `₹${this.gameState.config.bundleCost}`;
+        bgColor = canAfford ? 0x2e7d32 : 0x616161;
+        enabled = canAfford;
+      }
+    } else if (shop.upgradeStation?.isPlayerInside) {
+      label = 'UPGRADES';
+      sublabel = 'DESK';
+      bgColor = 0x5d4037;
+    }
+
+    if (label) {
+      this.isMobileActionActive = true;
+      this.mobileActionContainer.setVisible(true);
+      this.mobileActionText.setText(label);
+      this.mobileActionSubtext.setText(sublabel);
+
+      this.mobileActionBg.clear();
+      this.mobileActionBg.fillStyle(bgColor, enabled ? 0.95 : 0.6);
+      this.mobileActionBg.fillCircle(0, 0, 36);
+      this.mobileActionBg.lineStyle(2.5, enabled ? 0xffd54f : 0x9e9e9e, 1.0);
+      this.mobileActionBg.strokeCircle(0, 0, 36);
+    } else {
+      this.isMobileActionActive = false;
+      this.mobileActionContainer.setVisible(false);
+    }
   }
 
   update() {
     this.updateContextualActionCard();
+    this.updateMobileActionState();
     // Continuously update timer display to stay in sync with simulation delta
     this.updateTimerText();
   }
@@ -385,14 +693,21 @@ export class UIScene extends Phaser.Scene {
     const isInsideOffice = shopScene.upgradeStation?.isPlayerInside;
     const isInsideDispatch = shopScene.dispatchStation?.isPlayerInside;
 
+    const isMobile = this.isMobileActive();
     let prompt = '';
     let bgColor = 0x37474f;
 
     if (isInsideShelf) {
       const hasBundle = this.gameState.carried.type === 'bundle';
-      prompt = hasBundle
-        ? 'Supply Shelf • R: Return carried ingredients'
-        : `Supply Shelf • E: Buy ingredients ₹${this.gameState.config.bundleCost}`;
+      if (isMobile) {
+        prompt = hasBundle
+          ? 'Supply Shelf • Tap ACTION to return ingredients'
+          : `Supply Shelf • Tap ACTION to buy ingredients ₹${this.gameState.config.bundleCost}`;
+      } else {
+        prompt = hasBundle
+          ? 'Supply Shelf • R: Return carried ingredients'
+          : `Supply Shelf • E: Buy ingredients ₹${this.gameState.config.bundleCost}`;
+      }
       bgColor = hasBundle ? 0x1565c0 : 0x2e7d32;
     } else if (isInsideSteamer1) {
       const steamer = this.gameState.steamers.find(s => s.id === 0);
@@ -409,7 +724,9 @@ export class UIScene extends Phaser.Scene {
     } else if (isInsideSteamer2) {
       const steamer = this.gameState.steamers.find(s => s.id === 1);
       if (!steamer?.unlocked) {
-        prompt = 'Steamer 2 (Locked) • Upgrade at Desk ₹90';
+        prompt = isMobile
+          ? 'Steamer 2 (Locked) • Tap ACTION at Upgrade Desk'
+          : 'Steamer 2 (Locked) • Upgrade at Desk ₹90';
         bgColor = 0x00838f;
       } else if (steamer?.state === 'ready') {
         prompt = 'Steamer 2 • Collect cooked modaks';
@@ -434,7 +751,9 @@ export class UIScene extends Phaser.Scene {
         bgColor = 0xd97706;
       }
     } else if (isInsideOffice) {
-      prompt = 'Upgrade Desk • E: Open';
+      prompt = isMobile
+        ? 'Upgrade Desk • Tap ACTION to open'
+        : 'Upgrade Desk • E: Open';
       bgColor = 0x4e342e;
     }
 
@@ -442,7 +761,9 @@ export class UIScene extends Phaser.Scene {
       this.actionCardContainer.setVisible(true);
       const gameSize = this.scale.gameSize;
       const isPortrait = gameSize.height > gameSize.width;
-      const maxCardWidth = isPortrait ? Math.max(260, gameSize.width - 24) : 420;
+      const maxCardWidth = isMobile
+        ? Math.min(gameSize.width - 24, 380)
+        : 420;
 
       this.actionCardText.setWordWrapWidth(maxCardWidth - 24);
       this.actionCardText.setText(prompt);
@@ -457,6 +778,12 @@ export class UIScene extends Phaser.Scene {
       this.actionCardBg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
       this.actionCardBg.lineStyle(1.5, 0xffd54f, 0.85);
       this.actionCardBg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
+
+      let cardY = gameSize.height - 52;
+      if (isMobile) {
+        cardY = isPortrait ? gameSize.height - 140 : 74;
+      }
+      this.actionCardContainer.setPosition(gameSize.width / 2, cardY);
     } else {
       this.actionCardContainer.setVisible(false);
     }
@@ -495,32 +822,53 @@ export class UIScene extends Phaser.Scene {
 
     // Objective text with campaign stage awareness
     let objectiveString = '';
+    let compactObjective = '';
+    let timerSnippet = 'Festival Setup';
+
     if (this.campaignState) {
       const stage = this.campaignState.stage;
       if (stage === 'ONBOARDING') {
         objectiveString = this.gameState.getCurrentObjective().text;
+        compactObjective = objectiveString;
+        timerSnippet = 'Setup';
       } else if (stage === 'FESTIVAL_OPEN' || stage === 'GROW_BUSINESS') {
         const upCount = this.campaignState.getUpgradeCount(this.gameState);
         objectiveString = `Upgrade the Mahal: ${upCount}/4 (Carry, Packer, Cashier, Steamer 2)`;
+        compactObjective = `Upgrades: ${upCount}/4`;
       } else if (stage === 'FESTIVAL_RUSH') {
         const upCount = this.campaignState.getUpgradeCount(this.gameState);
         const rushSecs = Math.ceil(this.campaignState.rushState.timer);
         objectiveString = `Festival Rush! Fast Service (${rushSecs}s) • Upgrades: ${upCount}/4`;
+        compactObjective = `Rush (${rushSecs}s) • ${upCount}/4`;
       } else if (stage === 'PANDAL_ORDER') {
         objectiveString = `Grand Pandal Order: ${this.campaignState.pandalBoxesReserved}/${this.campaignState.config.pandalOrderTargetBoxes} packed boxes`;
+        compactObjective = `Pandal: ${this.campaignState.pandalBoxesReserved}/12 boxes`;
       } else if (stage === 'DISPATCHING') {
         const dispatchSecs = Math.max(
           0,
           Math.ceil(this.campaignState.config.courierDispatchDurationSeconds - this.campaignState.courierDispatchTimer)
         );
         objectiveString = `Courier Dispatching Grand Pandal Order! (${dispatchSecs}s)`;
+        compactObjective = `Dispatching (${dispatchSecs}s)`;
       } else if (stage === 'VICTORY') {
         objectiveString = 'Victory! Grand Pandal Order Delivered!';
+        compactObjective = 'Victory!';
+        timerSnippet = 'Victory 🎉';
       } else if (stage === 'TIME_EXPIRED') {
         objectiveString = 'The Festival Has Closed.';
+        compactObjective = 'Closed';
+        timerSnippet = 'Closed ⌛';
+      }
+
+      if (stage !== 'ONBOARDING' && stage !== 'VICTORY' && stage !== 'TIME_EXPIRED') {
+        const secs = Math.ceil(this.campaignState.timeRemaining);
+        const mins = Math.floor(secs / 60);
+        const remSecs = secs % 60;
+        timerSnippet = `⏱ ${mins.toString().padStart(2, '0')}:${remSecs.toString().padStart(2, '0')}`;
       }
     } else {
       objectiveString = this.gameState.getCurrentObjective().text;
+      compactObjective = objectiveString;
     }
 
     this.objectiveText.setText(objectiveString);
@@ -552,24 +900,33 @@ export class UIScene extends Phaser.Scene {
       this.announcementContainer.setVisible(false);
     }
 
-    // Mobile summary
-    this.mobileSummaryText.setText(
-      `₹${this.gameState.coins} • ★ ${this.gameState.businessRating.toFixed(1)} • ${this.carriedText.text} • ${objectiveString}`
-    );
+    // Mobile Top Bar texts
+    if (this.mobileTitleText) {
+      this.mobileTitleText.setText(`MODAK MAHAL  •  ${timerSnippet}`);
+    }
+
+    if (this.mobileSummaryText) {
+      const carriedSummary = carried.count > 0 ? `${carried.count} ${carried.type}` : 'Empty';
+      this.mobileSummaryText.setText(
+        `₹${this.gameState.coins} • ★ ${this.gameState.businessRating.toFixed(1)} • ${carriedSummary} • ${compactObjective}`
+      );
+    }
   }
 
-  private updateResponsiveHud(gameSize: Phaser.Structs.Size) {
-    const screenWidth = gameSize.width;
-    const screenHeight = gameSize.height;
+  public updateResponsiveHud(gameSize?: Phaser.Structs.Size) {
+    const size = gameSize || this.scale.gameSize;
+    const screenWidth = size.width;
+    const screenHeight = size.height;
+    const isMobile = this.isMobileActive();
     const isPortrait = screenHeight > screenWidth;
 
-    this.desktopHudContainer?.setVisible(!isPortrait);
-    this.mobileHudBg?.setVisible(isPortrait);
-    this.mobileTitleText?.setVisible(isPortrait);
-    this.mobileSummaryText?.setVisible(isPortrait);
-    this.controlsText?.setVisible(!isPortrait);
+    this.desktopHudContainer?.setVisible(!isMobile);
+    this.mobileHudBg?.setVisible(isMobile);
+    this.mobileTitleText?.setVisible(isMobile);
+    this.mobileSummaryText?.setVisible(isMobile);
+    this.controlsText?.setVisible(!isMobile);
 
-    if (!isPortrait) {
+    if (!isMobile) {
       if (this.topBarGraphics) {
         this.topBarGraphics.clear();
         this.topBarGraphics.fillStyle(COLORS.paper, 1.0);
@@ -615,21 +972,56 @@ export class UIScene extends Phaser.Scene {
       if (this.mobileHudBg) {
         this.mobileHudBg.clear();
         this.mobileHudBg.fillStyle(COLORS.paper, 1.0);
-        this.mobileHudBg.fillRect(0, 0, screenWidth, 54);
+        this.mobileHudBg.fillRect(0, 0, Math.max(screenWidth, 1920), 54);
         this.mobileHudBg.lineStyle(2, COLORS.brass, 0.85);
-        this.mobileHudBg.lineBetween(0, 54, screenWidth, 54);
+        this.mobileHudBg.lineBetween(0, 54, Math.max(screenWidth, 1920), 54);
+      }
+      if (this.mobileTitleText) {
+        this.mobileTitleText.setPosition(12, 8);
       }
       if (this.mobileSummaryText) {
-        this.mobileSummaryText.setWordWrapWidth(screenWidth - 28);
+        this.mobileSummaryText.setPosition(12, 30);
+        this.mobileSummaryText.setWordWrapWidth(screenWidth - 58);
       }
-      if (this.actionCardContainer) {
-        this.actionCardContainer.setPosition(screenWidth / 2, screenHeight - 44);
+      if (this.mobilePauseBtnContainer) {
+        this.mobilePauseBtnContainer.setPosition(screenWidth - 48, 7);
       }
     }
 
-    // Modal dialog responsiveness
+    // Position Mobile Virtual Joystick: bottom-left safe area
+    if (this.joystickContainer) {
+      const joyX = isPortrait ? 70 : 80;
+      const joyY = screenHeight - (isPortrait ? 75 : 65);
+      this.joystickBaseX = joyX;
+      this.joystickBaseY = joyY;
+      this.joystickContainer.setPosition(joyX, joyY);
+    }
+
+    // Position Mobile Action Button: bottom-right safe area
+    if (this.mobileActionContainer) {
+      const actX = screenWidth - (isPortrait ? 65 : 75);
+      const actY = screenHeight - (isPortrait ? 75 : 65);
+      this.mobileActionContainer.setPosition(actX, actY);
+    }
+
+    // Update Guide modal copy
+    if (this.guideControlsText && this.guideStartHintText) {
+      if (isMobile) {
+        this.guideControlsText.setText(
+          'Move: Drag joystick   •   Interact: Tap ACTION   •   Pause: Tap [❚❚]'
+        );
+        this.guideStartHintText.setText('Tap START FESTIVAL to begin');
+      } else {
+        this.guideControlsText.setText(
+          'Move: WASD / Arrow Keys   •   Interact: Walk close / [E]   •   Pause: [P] / [Esc]'
+        );
+        this.guideStartHintText.setText('Press [Enter], [Space], or [Esc] to begin');
+      }
+    }
+
+    // Modal dialog responsiveness (scaled to fit both width and height)
     if (this.dialogContainer && this.modalDimmer) {
-      const modalScale = isPortrait ? Math.min(1, (screenWidth - 24) / 560) : 1.0;
+      const modalScale = Math.min(1.0, (screenWidth - 20) / 560, (screenHeight - 20) / 400);
       this.dialogContainer.setScale(modalScale);
       this.dialogContainer.setPosition(screenWidth / 2, screenHeight / 2);
       this.modalDimmer.clear();
@@ -640,7 +1032,11 @@ export class UIScene extends Phaser.Scene {
     if (this.pauseModalContainer) {
       const pDialog = (this.pauseModalContainer as any).__dialog;
       const pDimmer = (this.pauseModalContainer as any).__dimmer;
-      if (pDialog) pDialog.setPosition(screenWidth / 2, screenHeight / 2);
+      if (pDialog) {
+        const pauseScale = Math.min(1.0, (screenWidth - 20) / 420, (screenHeight - 20) / 290);
+        pDialog.setScale(pauseScale);
+        pDialog.setPosition(screenWidth / 2, screenHeight / 2);
+      }
       if (pDimmer) {
         pDimmer.clear();
         pDimmer.fillStyle(0x000000, 0.7);
@@ -651,7 +1047,11 @@ export class UIScene extends Phaser.Scene {
     if (this.resultsModalContainer) {
       const rDialog = (this.resultsModalContainer as any).__dialog;
       const rDimmer = (this.resultsModalContainer as any).__dimmer;
-      if (rDialog) rDialog.setPosition(screenWidth / 2, screenHeight / 2);
+      if (rDialog) {
+        const resultsScale = Math.min(1.0, (screenWidth - 20) / 600, (screenHeight - 20) / 450);
+        rDialog.setScale(resultsScale);
+        rDialog.setPosition(screenWidth / 2, screenHeight / 2);
+      }
       if (rDimmer) {
         rDimmer.clear();
         rDimmer.fillStyle(0x000000, 0.78);
@@ -663,7 +1063,7 @@ export class UIScene extends Phaser.Scene {
       const gDialog = (this.guideModalContainer as any).__dialog;
       const gDimmer = (this.guideModalContainer as any).__dimmer;
       if (gDialog) {
-        const guideScale = isPortrait ? Math.min(1, (screenWidth - 24) / 560) : 1.0;
+        const guideScale = Math.min(1.0, (screenWidth - 20) / 560, (screenHeight - 20) / 460);
         gDialog.setScale(guideScale);
         gDialog.setPosition(screenWidth / 2, screenHeight / 2);
       }
@@ -673,6 +1073,10 @@ export class UIScene extends Phaser.Scene {
         gDimmer.fillRect(0, 0, screenWidth, screenHeight);
       }
     }
+
+    this.resetJoystick();
+    this.updateControlsVisibility();
+    this.updateHUD();
   }
 
   // ==========================================
@@ -701,6 +1105,8 @@ export class UIScene extends Phaser.Scene {
       shop.player.clearMovementInput();
     }
 
+    this.resetJoystick();
+    this.updateControlsVisibility();
     this.pauseModalContainer?.setVisible(true);
   }
 
@@ -716,6 +1122,7 @@ export class UIScene extends Phaser.Scene {
       shop.player.clearMovementInput();
     }
     this.pauseModalContainer?.setVisible(false);
+    this.updateControlsVisibility();
   }
 
   private buildPauseModal() {
@@ -852,6 +1259,8 @@ export class UIScene extends Phaser.Scene {
       shop.player.clearMovementInput();
     }
 
+    this.resetJoystick();
+    this.updateControlsVisibility();
     this.guideModalContainer?.setVisible(true);
   }
 
@@ -872,6 +1281,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     this.guideModalContainer?.setVisible(false);
+    this.updateControlsVisibility();
   }
 
   private buildGuideModal() {
@@ -997,7 +1407,7 @@ export class UIScene extends Phaser.Scene {
     controlsBg.lineStyle(1, 0x4e342e, 0.6);
     controlsBg.strokeRoundedRect(-245, 92, 490, 26, 6);
 
-    const controlsText = this.add.text(
+    this.guideControlsText = this.add.text(
       0,
       105,
       'Move: WASD / Arrow Keys   •   Interact: Walk close / [E]   •   Pause: [P] / [Esc]',
@@ -1030,7 +1440,7 @@ export class UIScene extends Phaser.Scene {
       this.closeGuideModal();
     });
 
-    const startHint = this.add.text(0, 186, 'Press [Enter], [Space], or [Esc] to begin', {
+    this.guideStartHintText = this.add.text(0, 186, 'Press [Enter], [Space], or [Esc] to begin', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '10.5px',
       color: '#9e9e9e'
@@ -1049,9 +1459,9 @@ export class UIScene extends Phaser.Scene {
       finaleDesc,
       finaleHighlight,
       controlsBg,
-      controlsText,
+      this.guideControlsText,
       startBtn,
-      startHint
+      this.guideStartHintText
     ]);
 
     this.guideModalContainer.add(dialog);
@@ -1069,6 +1479,8 @@ export class UIScene extends Phaser.Scene {
       shop.player.isInputBlocked = true;
       shop.player.clearMovementInput();
     }
+    this.resetJoystick();
+    this.updateControlsVisibility();
 
     let snapshot = this.campaignState.finalSnapshot;
     if (!snapshot) {
@@ -1518,6 +1930,9 @@ export class UIScene extends Phaser.Scene {
     }
     shop?.upgradeStation?.syncPrompt(true);
 
+    this.resetJoystick();
+    this.updateControlsVisibility();
+
     if (this.campaignState) {
       this.campaignState.isPaused = true;
     }
@@ -1542,6 +1957,8 @@ export class UIScene extends Phaser.Scene {
     if (this.campaignState && !this.isPauseModalOpen && !this.isResultsModalOpen) {
       this.campaignState.isPaused = false;
     }
+
+    this.updateControlsVisibility();
   }
 
   public handleModalKeyDown(event: KeyboardEvent) {

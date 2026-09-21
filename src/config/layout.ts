@@ -19,6 +19,11 @@ export const COLORS = {
   vermilion: 0xb84e3b
 } as const;
 
+import {
+  clampFeedbackToViewport,
+  type CameraViewportBounds
+} from '../utils/mobileControls.ts';
+
 export interface FeedbackBounds {
   width: number;
   height: number;
@@ -30,12 +35,30 @@ export interface FeedbackBounds {
   maxY: number;
 }
 
-export function calculateFeedbackBounds(text: string, coinBadgeText?: string): FeedbackBounds {
+export function calculateFeedbackBounds(
+  text: string,
+  coinBadgeText?: string,
+  camera?: CameraViewportBounds
+): FeedbackBounds {
   const approxCharWidth = 6.8;
   const textWidth = Math.min(190, text.length * approxCharWidth);
   const padX = 10;
   const width = Math.max(70, Math.min(210, textWidth + padX * 2));
   const height = coinBadgeText ? 34 : 22;
+
+  if (camera) {
+    const clamped = clampFeedbackToViewport(850, 250, { width, height }, camera);
+    return {
+      width,
+      height,
+      cardX: clamped.x,
+      cardY: clamped.y,
+      minX: clamped.minX,
+      maxX: clamped.maxX,
+      minY: clamped.minY,
+      maxY: clamped.maxY
+    };
+  }
 
   const cardY = 250; // Positioned strictly above customer bubbles (bubbles at y ≈ 305)
   const cardX = Math.min(LOGICAL_WIDTH - width / 2 - 4, Math.max(width / 2 + 4, 850));

@@ -1,24 +1,68 @@
 # Modak Mahal — project status
 
-Updated: 2026-09-20 (Final Submission Audit and GitHub Release — GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED)
+Updated: 2026-09-21 (Mobile Controls & Feedback Edge Correction Deployed — MOBILE_DEPLOYED_TO_PAGES)
 
 ## Ownership
 
 - State: WAITING_FOR_REVIEW
 - Owner: none
 - Next owner: none
-- Active handoff: GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED
+- Active handoff: MOBILE_DEPLOYED_TO_PAGES
 
 This is the active coordination state following the single-writer protocol in ANTIGRAVITY_START_HERE.md. Update this file before transferring ownership. Never infer completion from elapsed time.
 
 ## Current milestone
 
-- Milestone: Final Submission Audit and GitHub Release (FINAL_SUBMISSION_AUDIT_AND_GITHUB_RELEASE)
-- Status: COMPLETED — WAITING_FOR_USER_ACTION (Pages source must be set to GitHub Actions)
-- Previous milestone: Staff, Upgrade and Alignment Polish (STAFF_UPGRADE_AND_ALIGNMENT_POLISH_COMPLETE)
-- Next action: USER must go to https://github.com/darshitn/modak-mahal-festival-rush/settings/pages and set Source to GitHub Actions. Then re-run the workflow.
+- Milestone: Mobile Controls & Feedback Edge Correction Release (MOBILE_DEPLOYED_TO_PAGES)
+- Status: COMPLETED — DEPLOYED_TO_GITHUB_PAGES
+- Previous milestone: Mobile Feedback Edge Correction Pass (MOBILE_FEEDBACK_EDGE_CORRECTION_COMPLETE)
+- Next action: Test on real phone directly at https://darshitn.github.io/modak-mahal-festival-rush/ once GitHub Actions completes.
 
 ## Completed
+
+- **Customer Feedback Card Viewport Clamping (`Customer.ts`, `mobileControls.ts`)**:
+  - Implemented `clampFeedbackToViewport` pure helper enforcing full visibility inside `camera.worldView`.
+  - Enforces minimum 8px screen-equivalent edge margin on all sides (`8 / camera.zoom`).
+  - Enforces mobile top HUD clearance (`(54 + 8) / camera.zoom`) to prevent text overlap.
+  - Accounts for 20px upward float tween animation so cards never cross top margins during animation.
+  - Automatically pulls feedback cards into view when the customer lane is offscreen on cropped mobile viewports (e.g. 844×390 landscape and 390×844 portrait), resolving the right-edge clipping defect.
+  - Perfectly preserves original desktop placement (`x = 850, y = 250`) on 1366×768 and 1920×1080.
+  - Added 5 focused unit tests covering all edge cases (86/86 total tests green).
+  - Captured evidence across all required viewports with 0 console errors.
+
+- **Mobile Controls and Responsiveness Implemented & Verified**:
+  - **Screen-Anchored Virtual Joystick (`UIScene.ts`)**:
+    - Placed at bottom-left inside mobile safe margins (`x: 65, y: height - 65`).
+    - Base radius 45px (~90px diameter), knob radius 22px (~44px diameter).
+    - Multi-touch pointer ID tracking: joystick claims the touch pointer that activated it, allowing a second finger to tap ACTION without resetting joystick position.
+    - Smooth 360° drag physics with 8px dead zone and 1.0 clamped diagonal speed.
+    - Instant velocity zeroing and knob reset on pointerup, pointerupoutside, gameout, window blur, resize/orientation change, pause, and modal opening.
+  - **Contextual Mobile Action Button (`UIScene.ts`)**:
+    - Large screen-anchored circular action button at bottom-right (`x: width - 65, y: height - 65`).
+    - Contextual labels: `BUY [₹12]`, `RETURN [SHELF]`, `UPGRADES [DESK]`.
+    - Dispatches real station methods (`attemptBuy()`, `attemptReturn()`, `openModal()`).
+    - Multi-touch safe: tapping ACTION does not disrupt active joystick movement.
+    - Hidden when no manual station interaction exists or during modals.
+  - **Mobile Pause Control (`UIScene.ts`)**:
+    - Top-right mobile HUD pause button (`[❚❚]`, 44×44 CSS px touch target).
+    - Toggles pause modal, respects modal priorities, and does not conflict with upgrade modal closing.
+  - **Portrait Camera & Empty-Space Defect Resolution (`ShopScene.ts`)**:
+    - Corrected zoom formula: `zoom = max(width/400, height/540)`. At 390×844, `zoom = 1.563`, visible world height is exactly `540px` (100% vertical fill), eliminating the empty dark lower third.
+    - Camera follows the player horizontally clamped strictly to world bounds $[0, 960]$ without stretching background artwork.
+  - **Compact Mobile Landscape Adaptation (`ShopScene.ts`, `UIScene.ts`)**:
+    - At compact mobile landscape (844×390), zoom is set to `max(1.0, height/380) ≈ 1.026` with player tracking and touch controls enabled.
+    - Desktop viewports (1024×600, 1366×768, 1920×1080) retain full shop view with touch controls cleanly hidden.
+  - **Input & Modal Isolation**:
+    - While guide, upgrade, pause, or victory/timeout modals are open, touch controls are hidden and virtual movement is cleared.
+  - **Mobile HUD & Prompt Copy**:
+    - Top HUD formatted compactly to prevent text overflow.
+    - Contextual action card moved safely above touch controls (`y = height - 140` in portrait).
+    - Mobile contextual prompt displays `"Tap ACTION"` while desktop preserves `[E]` / `[R]` keyboard hints.
+    - Opening guide provides touch instructions on mobile viewports.
+  - **Automated Unit & Browser Verification**:
+    - 16 new unit tests in `src/tests/mobileControls.test.ts` (all 81 tests green across 4 suites).
+    - Clean production build (`npm run build`).
+    - Full automated CDP browser test across 6 viewports (390×844, 412×915, 844×390, 1024×600, 1366×768, 1920×1080) verifying complete touch gameplay loop, station interactions, modal isolation, multi-touch concurrency, resize resets, and 0 console errors.
 
 - **Winnable Festival Campaign Implemented**:
   - **7 Explicit Campaign Stages**:

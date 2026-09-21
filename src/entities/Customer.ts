@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
 import { calculateFeedbackBounds } from '../config/layout.ts';
+import {
+  clampFeedbackToViewport,
+  extractCameraViewport,
+  isMobileLayout
+} from '../utils/mobileControls.ts';
 
 export class Customer extends Phaser.GameObjects.Container {
   public id: string;
@@ -188,10 +193,6 @@ export class Customer extends Phaser.GameObjects.Container {
       }
     }
 
-    // Position strictly above customer speech bubbles (which sit at y ≈ 305)
-    // and strictly within 960x540 viewport
-    const cardY = 250;
-
     const textColor =
       type === 'success' ? '#1b5e20' : type === 'warning' ? '#b45309' : '#b91c1c';
 
@@ -220,10 +221,20 @@ export class Customer extends Phaser.GameObjects.Container {
       coinLabel.setOrigin(0.5).setResolution(2);
     }
 
-    // Clamp X so entire card remains within 960 viewport (4px margin)
-    const cardX = Math.min(960 - width / 2 - 4, Math.max(width / 2 + 4, 850));
+    // Clamp feedback card position so it stays fully visible inside the current camera viewport
+    // (accounting for camera scroll, zoom, min 8px screen edge margin, and mobile top HUD clearance)
+    const cam = scene.cameras?.main;
+    const isMobile = cam && scene.scale ? isMobileLayout(scene.scale.width, scene.scale.height) : false;
+    const viewport = extractCameraViewport(cam, isMobile);
+    const clamped = clampFeedbackToViewport(850, 250, { width, height }, viewport);
+
+    const cardX = clamped.x;
+    const cardY = clamped.y;
 
     const cardContainer = scene.add.container(cardX, cardY);
+    cardContainer.setSize(width, height);
+    cardContainer.setData('feedbackWidth', width);
+    cardContainer.setData('feedbackHeight', height);
     cardContainer.setDepth(3000);
 
     // High-contrast cream backplate with crisp dark border

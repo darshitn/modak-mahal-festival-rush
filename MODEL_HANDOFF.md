@@ -1678,9 +1678,180 @@ Rewrote `README.md` with:
 
 - State: `WAITING_FOR_REVIEW`
 - Owner: `none`
-- Active handoff: `GITHUB_PUSHED_PAGES_CONFIGURATION_REQUIRED`
+- Active handoff: `MOBILE_CONTROLS_AND_COMPATIBILITY_COMPLETE`
 
+---
 
+## HANDOFF-007 — MOBILE_CONTROLS_AND_COMPATIBILITY pass (Gemini)
 
+- Assigned model: Gemini (in Antigravity)
+- Date: 21 September 2026
+- Outcome: COMPLETE — WAITING_FOR_REVIEW
+- Owner: none
+- State: WAITING_FOR_REVIEW
+- Active handoff: MOBILE_CONTROLS_AND_COMPATIBILITY_COMPLETE
 
+### 1. Diagnosis of Verified Defects
+1. **Missing Touch Movement**: At 390×844 and other touch viewports, player could not move because no on-screen movement controller existed.
+2. **Missing Mobile Contextual Action / Pause Controls**: No on-screen controls existed to buy/return ingredients, open upgrades, or pause the game on touch devices.
+3. **Portrait Camera Empty Space Defect**: `ShopScene.configureCamera()` was computing zoom primarily by fitting width (`zoom = width / 960`), which caused portrait 390×844 to have `zoom ≈ 0.406` and height ≈ 220px, leaving more than half the screen as unused black space.
+4. **Mobile Landscape Scale & Missing Controls**: At compact landscape (844×390), the full 960×540 shop was shrunken into a miniature and lacked touch controls.
+5. **Contextual Action Card Clutter**: The existing action card occupied the bottom safe area where touch controls need to reside.
+6. **Keyboard-Only Opening Guide & Prompts**: Guide instructions and prompt cards only instructed desktop keys (`WASD`, `[E]`, `[R]`).
+7. **README Misstatement**: README claimed a touch thumbstick existed when it was not yet implemented.
 
+### 2. Architecture & Implementation Summary
+1. **Pure Mobile Helpers (`src/utils/mobileControls.ts`)**:
+   - `isMobileLayout(width, height)`: Classifies viewport as mobile if `height > width` (any portrait phone) or `(height <= 500 && width <= 920)` (short mobile landscape).
+   - `calculateJoystickVector(dx, dy, radius, deadZone)`: Computes 360° virtual joystick vector, clamps knob to max radius (45px), applies center dead-zone (8px), and normalizes diagonal vectors to max length 1.0.
+   - `combineInputVectors(keyboardVx, keyboardVy, virtualVx, virtualVy)`: Safely combines keyboard and virtual joystick inputs, normalizing diagonal movement so combined speed never exceeds 1.0.
+   - `getCameraLayoutConfig(viewportWidth, viewportHeight)`: Calculates zoom and camera follow strategy:
+     - Portrait (e.g. 390×844): `zoom = max(width/400, height/540)`. For 390×844, `zoom = 844/540 ≈ 1.563`. Visible world height is exactly `844 / 1.563 = 540`, perfectly filling the vertical viewport with zero black space while tracking the player horizontally clamped to world bounds [0, 960].
+     - Mobile Landscape (e.g. 844×390): `zoom = max(1.0, height/380) ≈ 1.026`, tracking the player.
+     - Desktop (e.g. 1024×600, 1366×768, 1920×1080): `zoom = min(width/960, height/540)`, fitting the complete shop without scrolling or touch controls.
+2. **Player Entity (`src/entities/Player.ts`)**:
+   - Added `virtualVx`, `virtualVy`, `setVirtualMovement(x, y)`, `clearVirtualMovement()`.
+   - `Player.update()` combines keyboard and virtual joystick via `combineInputVectors()`.
+   - Added `clearMovementInput()` to cleanly reset both keyboard and virtual velocity when modals open.
+3. **Touch Movement Joystick (`src/scenes/UIScene.ts`)**:
+   - Screen-anchored container at bottom-left inside mobile safe area (`x: 65, y: height - 65`).
+   - Outer base ring (radius 45px, ~90px diameter) and inner knob (radius 22px, ~44px diameter).
+   - Multi-pointer tracking (`this.input.addPointer(2)`).
+   - Touch drag tracks `joystickPointerId` exclusively, allowing a second finger to tap `ACTION` simultaneously without interfering with movement.
+   - Resets movement on pointerup, pointerupoutside, gameout, window blur, resize/orientation change, pause, and modal opening.
+4. **Contextual Mobile Action Button (`src/scenes/UIScene.ts`)**:
+   - Screen-anchored circular action button at bottom-right (`x: width - 65, y: height - 65`).
+   - Dispatches real station methods:
+     - At `IngredientStation`: calls `attemptReturn()` when carrying bundles, `attemptBuy()` when hands empty.
+     - At `UpgradeStation`: calls `openModal()`.
+   - Dynamic contextual labels: `BUY [₹12]`, `RETURN [SHELF]`, `UPGRADES [DESK]`.
+   - Automatically hidden when no manual station interaction exists or during modals.
+5. **Mobile Pause Button (`src/scenes/UIScene.ts`)**:
+   - Screen-anchored button (`[❚❚]`) at top-right mobile HUD (`x: width - 42, y: 26`, touch target 44×44 CSS px).
+   - Toggles pause modal, respects existing modal priorities, and does not interfere with upgrade modal `Escape` closures.
+6. **Input and Modal Isolation (`src/scenes/UIScene.ts`)**:
+   - While Guide, Upgrade, Pause, or Results modal is open: joystick and ACTION button are hidden, virtual movement is zeroed, and player input is blocked.
+7. **Mobile HUD and Action Card Adaptations**:
+   - Top mobile HUD formatted compactly without text clipping.
+   - Action card dynamically positioned above touch controls (`y = height - 140` in portrait, `y = 74` in mobile landscape).
+   - Contextual prompt text displays `"Tap ACTION"` on mobile while retaining keyboard prompts (`[E]`, `[R]`) on desktop.
+   - Opening guide modal displays mobile-specific touch instructions on mobile viewports.
+8. **HTML Safe Area & Viewport**:
+   - Updated `index.html` with `viewport-fit=cover` and CSS safe-area padding.
+
+### 3. Files Changed
+- `src/utils/mobileControls.ts` (NEW): Pure helpers for layout detection, joystick math, vector combination, camera configuration.
+- `src/tests/mobileControls.test.ts` (NEW): 16 unit tests for mobile controls helpers.
+- `src/entities/Player.ts`: Added virtual movement vectors, input combination, and clean reset methods.
+- `src/stations/IngredientStation.ts`: Made `attemptBuy()` and `attemptReturn()` public methods returning boolean.
+- `src/scenes/ShopScene.ts`: Integrated `getCameraLayoutConfig()`, responsive zoom, and player camera follow.
+- `src/scenes/UIScene.ts`: Integrated multi-touch joystick, contextual action button, mobile pause button, input isolation, modal scaling, responsive HUD, and mobile guide copy.
+- `index.html`: Added `viewport-fit=cover` and safe-area styling.
+- `README.md`: Updated controls table and added physical device testing note.
+- `TASKS.md`: Checked off Milestone 4.3 tasks.
+- `PROJECT_STATUS.md`: Set state to `WAITING_FOR_REVIEW` with owner `none`.
+
+### 4. Verification & Automated Test Results
+- **Unit Tests (`npm test -- --run`)**:
+  - 81 tests passing across 4 test suites (100% pass rate).
+  - 16 new unit tests in `src/tests/mobileControls.test.ts` covering dead zones, max radius clamping, diagonal normalization, movement combination, and mobile/desktop viewport classifications.
+- **Production Build (`npm run build`)**:
+  - `tsc && vite build` completed with Exit code 0.
+- **Automated Browser Acceptance Verification (CDP against production preview server `http://127.0.0.1:4173/modak-mahal-festival-rush/`)**:
+  - Tested viewports:
+    1. `390×844` portrait (mobile)
+    2. `412×915` portrait (mobile)
+    3. `844×390` landscape (mobile)
+    4. `1024×600` compact landscape (desktop without touch)
+    5. `1366×768` desktop (desktop without touch)
+    6. `1920×1080` desktop (desktop without touch)
+  - Interactive test sequence at 390×844:
+    1. Opening guide displayed mobile instructions; closed via touch button.
+    2. Zero black space verified: visible world height at zoom 1.563 was exactly 540.0px.
+    3. Joystick walked player to Supply Shelf.
+    4. ACTION button contextually displayed `RETURN [SHELF]`; tapping RETURN returned bundle and emptied hands.
+    5. ACTION button contextually displayed `BUY [₹12]`; tapping BUY purchased bundle (coins 30 -> 18).
+    6. Steamer 1 loaded; cooking timer ran 8.5s; collected cooked batch.
+    7. Packing station packed 3 boxes; collected boxes.
+    8. Service counter served customer; completed sale (+13 coins, rating updated).
+    9. Upgrade Desk displayed `UPGRADES [DESK]` action button; tapping ACTION opened upgrade modal.
+    10. Controls isolated during upgrade modal (joystick and action button hidden); closed modal via touch close button.
+    11. Mobile pause button `[❚❚]` paused and resumed the game.
+    12. Simultaneous joystick + ACTION verified (pointer 1 on joystick retained when pointer 2 tapped ACTION).
+    13. Rotation/resize during movement tested (no stuck input).
+    14. Verified zero console errors across all viewports.
+
+### 5. Screenshots Captured
+- `screenshot_portrait_390x844_gameplay.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_portrait_390x844_gameplay.png
+- `screenshot_portrait_412x915.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_portrait_412x915.png
+- `screenshot_landscape_844x390.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_landscape_844x390.png
+- `screenshot_compact_1024x600.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_compact_1024x600.png
+- `screenshot_desktop_1366x768.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_desktop_1366x768.png
+- `screenshot_desktop_1920x1080.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_desktop_1920x1080.png
+
+### 6. Remaining Limitations & Real-Device Note
+- Verification was conducted via automated Chrome DevTools Protocol headless touch emulation across the required mobile and desktop viewports. While pointer events, multi-touch IDs, and layout geometries are strictly verified, hands-on physical validation on various iOS/Android mobile hardware is recommended for real-world ergonomics.
+
+---
+
+## HANDOFF-008 — MOBILE_FEEDBACK_EDGE_CORRECTION pass (Gemini)
+
+- Assigned model: Gemini (in Antigravity)
+- Date: 21 September 2026
+- Outcome: COMPLETE — WAITING_FOR_REVIEW
+- Owner: none
+- State: WAITING_FOR_REVIEW
+- Active handoff: MOBILE_DEPLOYED_TO_PAGES
+
+### 1. Diagnosis of Verified Defect
+In `screenshot_landscape_844x390.png`, the "1★ Left unserved" customer feedback card was partially clipped at the right edge of the screen.
+- **Cause**: `Customer.showLaneFeedback()` placed cards near a static world `x = 850`, assuming the full 960×540 shop is always visible. On mobile cameras (e.g. 844×390 landscape with visible width ~822px, and 390×844 portrait with visible width ~250px), the camera scrolls and crops the world to follow the player. When the player was toward the kitchen or packing areas, the customer queue lane at `x = 850` was partially or completely beyond the right edge of the camera viewport.
+
+### 2. Implementation Summary
+1. **Pure Viewport Clamping Helper (`src/utils/mobileControls.ts`)**:
+   - `clampFeedbackToViewport(desiredX, desiredY, card, camera, options)`:
+     - Derives safe visible rectangle in world units bounded by both camera viewport (`cam.worldView`) and the 960×540 world boundaries.
+     - Enforces a minimum 8px screen-equivalent margin on all sides (`8 / camera.zoom`).
+     - Enforces top mobile HUD clearance (`(54 + 8) / camera.zoom`) on mobile viewports.
+     - Accounts for the 20px upward float tween animation (`floatDistance: 20`) so feedback cards never enter the top HUD or top margin during their animation lifetime.
+     - Preserves the default placement (`x = 850, y = 250`) on full desktop views.
+     - Pulls the card smoothly into the nearest safe visible position when the customer lane is offscreen on mobile.
+   - `extractCameraViewport(cam, isMobile)`: Safely extracts camera scroll, viewport dimensions, zoom, and mobile status from Phaser cameras.
+2. **Customer Entity (`src/entities/Customer.ts`)**:
+   - In `Customer.showLaneFeedback()`: Measures dynamic text width, extracts current camera viewport, and positions `cardContainer` using `clampFeedbackToViewport`.
+   - Explicitly sets `cardContainer.setSize(width, height)` and stores dimensions in data attributes.
+   - Unchanged animation, colors, tip amount, star rating, and lifetime.
+3. **Layout Config (`src/config/layout.ts`)**:
+   - Updated `calculateFeedbackBounds` to accept optional `CameraViewportBounds`, delegating to `clampFeedbackToViewport` when a camera is provided while preserving original behavior when omitted.
+4. **Scenes (`src/scenes/ShopScene.ts`, `src/scenes/UIScene.ts`)**:
+   - `ShopScene.configureCamera(gameSize?: Phaser.Structs.Size)` made public with default fallback to `scale.gameSize`.
+   - `UIScene.updateResponsiveHud(gameSize?: Phaser.Structs.Size)` made public with default fallback to `scale.gameSize`.
+
+### 3. Files Changed
+- `src/utils/mobileControls.ts`: Added `CameraViewportBounds`, `ClampedFeedbackPosition`, `clampFeedbackToViewport`, `extractCameraViewport`.
+- `src/config/layout.ts`: Updated `calculateFeedbackBounds` to support camera-aware viewport clamping.
+- `src/entities/Customer.ts`: Updated `showLaneFeedback` to clamp cards to camera viewport and set container size.
+- `src/scenes/ShopScene.ts`: Made `configureCamera` public with optional parameter.
+- `src/scenes/UIScene.ts`: Made `updateResponsiveHud` public with optional parameter.
+- `src/tests/mobileControls.test.ts`: Added 5 focused unit tests for `clampFeedbackToViewport`.
+- `PROJECT_STATUS.md`: Updated coordination state to `WAITING_FOR_REVIEW` with owner `none`.
+- `MODEL_HANDOFF.md`: Recorded `HANDOFF-008` details and removed EOF blank line.
+
+### 4. Verification & Final Gates
+- **Unit Tests (`npm test -- --run`)**: **86/86 passed** across 4 suites (5 new tests in `mobileControls.test.ts` covering full desktop camera, cropped mobile camera, portrait camera, long 210px card, and minimum 8px safe margins).
+- **Production Build (`npm run build`)**: Completed cleanly with **Exit code 0**.
+- **Whitespace & Diff (`git diff --check`)**: Clean with **0 warnings / errors**.
+- **Automated Browser Verification (CDP on Production Preview `http://127.0.0.1:4173/modak-mahal-festival-rush/`)**:
+  - All 4 required evidence checkpoints verified:
+    1. **Evidence 1 (390×844 Portrait)**: Near Supply Shelf, contextual action button visible with `RETURN [SHELF]`.
+    2. **Evidence 2 (390×844 Portrait)**: Near Upgrade Desk, contextual action button visible with `UPGRADES [DESK]`.
+    3. **Evidence 3 (844×390 Landscape)**: "1★ Left unserved" feedback card clamped to `x = 770.7, y = 250`, screen right edge at `835.6px <= 836.0px` (`844 - 8px` margin). Entirely visible with zero clipping!
+    4. **Evidence 4 (1366×768 Desktop)**: Original desktop feedback position preserved at `x = 850, y = 250` with `isOriginalDesktopPlacement: true`.
+  - Zero console errors confirmed.
+
+### 5. Evidence Screenshots Captured
+- `evidence_1_portrait_390x844_supply_shelf.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/evidence_1_portrait_390x844_supply_shelf.png
+- `evidence_2_portrait_390x844_upgrade_desk.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/evidence_2_portrait_390x844_upgrade_desk.png
+- `evidence_3_landscape_844x390_feedback_card.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/evidence_3_landscape_844x390_feedback_card.png
+- `screenshot_landscape_844x390.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/screenshot_landscape_844x390.png
+- `evidence_4_desktop_1366x768_feedback_card.png`: file:///C:/Users/Darshit%20N/.gemini/antigravity-ide/brain/b30d1fa1-b9b9-4501-95b1-c6af76214bea/evidence_4_desktop_1366x768_feedback_card.png

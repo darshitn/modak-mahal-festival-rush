@@ -12,6 +12,7 @@ import { DispatchStation } from '../stations/DispatchStation.ts';
 import { PackerNPC, CashierNPC } from '../entities/Staff.ts';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
 import { CustomerSaleResult } from '../types/index.ts';
+import { getCameraLayoutConfig } from '../utils/mobileControls.ts';
 
 export interface CollisionBlocker {
   id: string;
@@ -228,33 +229,30 @@ export class ShopScene extends Phaser.Scene {
   }
 
   /**
-   * Desktop shows the compact shop in full. Portrait uses the same logical
-   * world but follows the shopkeeper, keeping the play area tall and usable.
+   * Desktop shows the compact shop in full. Mobile portrait and compact mobile
+   * landscape follow the player smoothly with responsive, readable zoom.
    */
-  private configureCamera(gameSize: Phaser.Structs.Size) {
+  public configureCamera(gameSize?: Phaser.Structs.Size) {
+    const size = gameSize || this.scale.gameSize;
     const camera = this.cameras.main;
-    const isPortrait = gameSize.height > gameSize.width;
-    const desktopZoom = Math.min(
-      gameSize.width / LOGICAL_WIDTH,
-      gameSize.height / LOGICAL_HEIGHT
+    const hasCoarse = typeof window !== 'undefined' && (
+      window.matchMedia?.('(pointer: coarse)').matches ||
+      ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0)
     );
-    // Portrait frames ~400px width cleanly without clipping stations or badges
-    const zoom = isPortrait
-      ? Math.min(gameSize.width / 400, 1.0)
-      : desktopZoom;
+    const layout = getCameraLayoutConfig(size.width, size.height, hasCoarse);
 
-    camera.setViewport(0, 0, gameSize.width, gameSize.height);
+    camera.setViewport(0, 0, size.width, size.height);
     camera.setBackgroundColor(0x1a0f0b);
     camera.setBounds(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-    camera.setZoom(zoom);
+    camera.setZoom(layout.zoom);
 
-    if (isPortrait) {
-      // Follow player with vertical offset so department badges are never covered by top HUD
-      camera.startFollow(this.player, true, 0.1, 0.1, 0, 35);
+    if (layout.followPlayer) {
+      camera.startFollow(this.player, true, 0.12, 0.12, layout.followOffsetX, layout.followOffsetY);
     } else {
       camera.stopFollow();
-      const visibleWidth = gameSize.width / zoom;
-      const visibleHeight = gameSize.height / zoom;
+      const visibleWidth = size.width / layout.zoom;
+      const visibleHeight = size.height / layout.zoom;
       camera.setScroll(
         (LOGICAL_WIDTH - visibleWidth) / 2,
         (LOGICAL_HEIGHT - visibleHeight) / 2

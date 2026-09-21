@@ -80,11 +80,18 @@
 - [ ] **M4.2 Audio System**
   - [ ] Implement `AudioManager` with Web Audio API sound effects (cooking, packing, coins, festival bells)
   - [ ] Add mute/volume toggle in HUD
-- [ ] **M4.3 Mobile Controls & Responsiveness**
-  - [ ] Implement touch virtual joystick with smooth drag tracking
-  - [ ] Test layout scaling at mobile (390x844) and desktop (1920x1080)
+- [x] **M4.3 Mobile Controls & Responsiveness**
+  - [x] Implement screen-anchored virtual joystick in `UIScene` with pointer ID tracking, dead zone, radius clamping, diagonal normalization, and blur/resize resets
+  - [x] Implement contextual mobile `ACTION` button (BUY, RETURN, UPGRADES) invoking station methods with multi-touch isolation
+  - [x] Implement mobile pause button (`[❚❚]`, 44×44 CSS px) respecting modal priorities
+  - [x] Fix portrait camera zoom in `ShopScene.configureCamera()` (vertical fit, zero black lower third, dynamic player tracking)
+  - [x] Implement compact mobile landscape layout and camera tracking (844×390)
+  - [x] Complete modal and touch isolation (virtual movement cleared, controls hidden during guide, upgrades, pause, results)
+  - [x] Adapt opening guide copy and contextual prompts for touch devices
+  - [x] Unit test pure mobile input helpers (16 unit tests in `src/tests/mobileControls.test.ts`)
+  - [x] Browser acceptance verification across 6 viewports (390×844, 412×915, 844×390, 1024×600, 1366×768, 1920×1080) with zero console errors
 - [ ] **M4.4 Milestone 4 Verification**
-  - [ ] Verify touch controls, audio responsiveness, 60 FPS performance, and clean build
+  - [ ] Verify audio responsiveness (audio deferred) and remaining visual polish
 
 ---
 

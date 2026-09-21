@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GameState } from '../state/GameState.ts';
 import { ItemType } from '../types/index.ts';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
+import { combineInputVectors } from '../utils/mobileControls.ts';
 
 export class Player extends Phaser.GameObjects.Container {
   public sprite: Phaser.GameObjects.Sprite;
@@ -19,6 +20,8 @@ export class Player extends Phaser.GameObjects.Container {
   public isMoving = false;
   public isInputBlocked = false;
   private walkTime = 0;
+  private virtualVx = 0;
+  private virtualVy = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, gameState: GameState) {
     super(scene, x, y);
@@ -53,9 +56,20 @@ export class Player extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
+  public clearVirtualMovement() {
+    this.virtualVx = 0;
+    this.virtualVy = 0;
+  }
+
+  public setVirtualMovement(x: number, y: number) {
+    this.virtualVx = x;
+    this.virtualVy = y;
+  }
+
   public clearMovementInput() {
     this.isMoving = false;
     this.sprite.y = 0;
+    this.clearVirtualMovement();
     if (this.cursors) {
       this.cursors.left.reset();
       this.cursors.right.reset();
@@ -77,21 +91,20 @@ export class Player extends Phaser.GameObjects.Container {
       return;
     }
 
-    let vx = 0;
-    let vy = 0;
+    let kx = 0;
+    let ky = 0;
 
     if (this.cursors && this.wasd) {
-      if (this.cursors.left.isDown || this.wasd.left.isDown) vx -= 1;
-      if (this.cursors.right.isDown || this.wasd.right.isDown) vx += 1;
-      if (this.cursors.up.isDown || this.wasd.up.isDown) vy -= 1;
-      if (this.cursors.down.isDown || this.wasd.down.isDown) vy += 1;
+      if (this.cursors.left.isDown || this.wasd.left.isDown) kx -= 1;
+      if (this.cursors.right.isDown || this.wasd.right.isDown) kx += 1;
+      if (this.cursors.up.isDown || this.wasd.up.isDown) ky -= 1;
+      if (this.cursors.down.isDown || this.wasd.down.isDown) ky += 1;
     }
 
-    // Normalize diagonal speed
-    if (vx !== 0 && vy !== 0) {
-      vx *= 0.7071;
-      vy *= 0.7071;
-    }
+    // Combine keyboard input with virtual joystick input safely and normalize once
+    const combined = combineInputVectors({ x: kx, y: ky }, { x: this.virtualVx, y: this.virtualVy });
+    const vx = combined.x;
+    const vy = combined.y;
 
     const dt = delta / 1000;
     this.x += vx * this.speed * dt;

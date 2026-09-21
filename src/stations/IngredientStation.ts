@@ -157,7 +157,7 @@ export class IngredientStation extends BaseStation {
     this.ringGraphics.fillEllipse(0, 10, 68, 26);
   }
 
-  private attemptBuy() {
+  public attemptBuy(): boolean {
     if (this.gameState.buyBundle()) {
       this.scene.tweens.add({
         targets: this.mainSprite,
@@ -172,7 +172,9 @@ export class IngredientStation extends BaseStation {
         yoyo: true
       });
       this.updateStockDisplay();
+      return true;
     }
+    return false;
   }
 
   private attemptPickup() {
@@ -190,7 +192,7 @@ export class IngredientStation extends BaseStation {
     }
   }
 
-  private attemptReturn() {
+  public attemptReturn(): boolean {
     if (this.gameState.returnBundleToStorage()) {
       this.suppressAutoPickupUntilExit = true;
       this.returnButtonContainer.setVisible(false);
@@ -201,6 +203,8 @@ export class IngredientStation extends BaseStation {
         duration: 120,
         yoyo: true
       });
+      return true;
     }
+    return false;
   }
 }

@@ -38,14 +38,14 @@ Victory!
 
 ## Controls
 
-| Action | Desktop | Mobile |
+| Action | Desktop | Mobile Touch |
 |---|---|---|
-| Move | `W A S D` or Arrow Keys | Virtual thumbstick (lower-left) |
-| Interact / Buy | Walk into station zone | Walk into station zone |
-| Open Upgrades | Walk to desk → `E` | Walk to desk → tap button |
-| Return Ingredients | `R` at Supply Shelf | `R` button shown at shelf |
-| Pause | `P` or `Escape` | Pause button (top bar) |
-| Close Upgrade Modal | `Escape` | `✕ Esc` button |
+| Move | `W A S D` or Arrow Keys | Screen-anchored Virtual Joystick (bottom-left) |
+| Interact / Auto-serve | Walk into station zone | Walk into station zone |
+| Buy / Return Ingredients | Walk into shelf → `R` to return, auto-pickup / `E` to buy | Walk into shelf → tap contextual `BUY` / `RETURN` button (bottom-right) |
+| Open Upgrades | Walk to desk → `E` | Walk to desk → tap contextual `UPGRADES` button |
+| Pause / Resume | `P` or `Escape` | Tap `[❚❚]` button (top-right mobile bar) |
+| Close Modals (Guide / Upgrades) | `Escape` or Click `[START]` / `[✕]` | Tap visible `[START FESTIVAL]` or `[✕ CLOSE]` buttons |
 
 ---
 
@@ -185,6 +185,7 @@ This game was developed with the assistance of AI coding tools (Google Antigravi
 - Local save/resume (on page refresh) is deferred — not implemented in this submission. Each page load starts a fresh game.
 - Audio system is not implemented in this version.
 - First-floor expansion is locked behind a "later upgrade" visual — the staircase is present but non-functional (intentionally deferred post-contest feature).
+- Mobile touch compatibility has been thoroughly tested via automated headless Chrome CDP touch-emulation across mobile viewports (390×844 portrait, 412×915 portrait, 844×390 landscape); physical testing on diverse handheld mobile devices remains recommended.
 
 ---
 
