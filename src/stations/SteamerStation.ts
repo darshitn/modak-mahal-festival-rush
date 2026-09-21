@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BaseStation } from './BaseStation.ts';
 import { GameState } from '../state/GameState.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 // Visual scale and alignment constants for illustrated steamer assembly:
 // Brass Steamer: asset 1177x1336, visible rows [111, 1213] (h=1103), cols [203, 980] (w=778)
@@ -43,6 +44,7 @@ export class SteamerStation extends BaseStation {
 
   // Compact progress bar beneath brass pot
   private progressBarGraphics: Phaser.GameObjects.Graphics;
+  private lastState: 'idle' | 'steaming' | 'ready' | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, steamerId: number, gameState: GameState) {
     super(
@@ -149,6 +151,18 @@ export class SteamerStation extends BaseStation {
   public update(_delta: number) {
     const steamer = this.gameState.steamers.find(s => s.id === this.steamerId);
     if (!steamer || !steamer.unlocked) return;
+
+    if (steamer.state === 'ready' && this.lastState !== 'ready') {
+      audioManager.playEffect('ready');
+      this.scene.tweens.add({
+        targets: this.cookedModaksSprite,
+        scaleX: PLATTER_STEAMER_SCALE * 1.12,
+        scaleY: PLATTER_STEAMER_SCALE * 1.12,
+        duration: 160,
+        yoyo: true
+      });
+    }
+    this.lastState = steamer.state;
 
     if (steamer.state === 'steaming') {
       this.drawCompactProgressBar(steamer.progress, 0xff7043);
@@ -292,6 +306,7 @@ export class SteamerStation extends BaseStation {
     // 1. Deposit compatible input before collecting output.
     if (this.gameState.carried.type === 'bundle') {
       if (this.gameState.loadSteamer(this.steamerId)) {
+        audioManager.playEffect('load');
         this.scene.tweens.add({
           targets: this.inputTableSprite,
           scaleY: IN_TBL_SCALE * 1.1,

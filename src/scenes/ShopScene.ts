@@ -13,6 +13,7 @@ import { PackerNPC, CashierNPC } from '../entities/Staff.ts';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
 import { CustomerSaleResult } from '../types/index.ts';
 import { getCameraLayoutConfig, getTourCameraScroll } from '../utils/mobileControls.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 export interface CollisionBlocker {
   id: string;
@@ -64,6 +65,7 @@ export class ShopScene extends Phaser.Scene {
     this.initCollisionBlockers();
 
     (window as any).__shopScene = this;
+    (window as any).__audioManager = audioManager;
     (window as any).__gameState = this.gameState;
     (window as any).__campaignState = this.campaignState;
     (window as any).__restartGame = () => this.restartGame();
@@ -117,6 +119,7 @@ export class ShopScene extends Phaser.Scene {
 
     // Listen for completed customer sales to advance campaign
     this.events.on('customer-sale-completed', (result: CustomerSaleResult) => {
+      this.playSaleFeedback(result.coinsEarned);
       this.campaignState.recordSale(result.stars);
     });
 
@@ -126,6 +129,29 @@ export class ShopScene extends Phaser.Scene {
     });
     this.game.events.on(Phaser.Core.Events.FOCUS, () => {
       this.player?.clearMovementInput();
+    });
+
+    // Initialize responsive audio manager (lazy loading, no music downloaded yet)
+    audioManager.init(this);
+
+    // First interaction triggers for audio lazy-load
+    this.input.keyboard?.once('keydown', () => audioManager.onFirstInteraction('shop_keydown'));
+    this.input.once('pointerdown', () => audioManager.onFirstInteraction('shop_pointerdown'));
+
+    // Subscribe to campaign state for adaptive music events
+    this.campaignState.subscribe(() => {
+      if (this.campaignState.stage === 'FESTIVAL_OPEN' && audioManager.phase === 'calm') {
+        audioManager.onFestivalStart();
+      } else if (this.campaignState.isPaused) {
+        audioManager.onPause();
+      } else if (!this.campaignState.isPaused && audioManager.phase !== 'victory' && audioManager.phase !== 'defeat') {
+        audioManager.onResume();
+      }
+      if (this.campaignState.stage === 'VICTORY' && audioManager.phase !== 'victory') {
+        audioManager.onVictory();
+      } else if (this.campaignState.stage === 'TIME_EXPIRED' && audioManager.phase !== 'defeat') {
+        audioManager.onDefeat();
+      }
     });
 
     // Spawn initial customers for active queue in customer street
@@ -141,6 +167,27 @@ export class ShopScene extends Phaser.Scene {
     this.gameState.recordCustomerDeparture();
     this.updateQueuePositions();
     this.campaignState.notify();
+  }
+
+  /** Shared for player- and cashier-triggered sales so feedback never diverges. */
+  private playSaleFeedback(coins: number) {
+    audioManager.playEffect('sale');
+    const label = this.add.text(this.counterStation.x, this.counterStation.y - 36, `+₹${coins}`, {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '13px',
+      color: '#ffd54f',
+      fontStyle: 'bold',
+      stroke: '#3e2723',
+      strokeThickness: 2
+    }).setOrigin(0.5).setDepth(2000);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 18,
+      alpha: 0,
+      duration: 600,
+      ease: 'Quad.Out',
+      onComplete: () => label.destroy()
+    });
   }
 
   public toggleCollisionOverlay() {
@@ -475,6 +522,7 @@ export class ShopScene extends Phaser.Scene {
 
     this.gameState.reset();
     this.campaignState.reset();
+    audioManager.onRestart();
 
     this.player.setPosition(260, 240);
     this.player.clearMovementInput();

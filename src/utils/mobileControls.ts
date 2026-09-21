@@ -301,6 +301,12 @@ export interface MobileControlPositions {
     width: number;
     height: number;
   };
+  soundButton: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 /**
@@ -308,7 +314,7 @@ export interface MobileControlPositions {
  * - Elevated joystick (around height - 115 in landscape, height - 110 in portrait) leaving ample downward drag clearance
  * - Ergonomically paired action button
  * - Action prompt card positioned safely away from thumb controls and HUD
- * - Top-bar pause and fullscreen buttons with >= 44x44px touch targets
+ * - Top-bar pause, fullscreen, and sound toggle buttons with >= 44x44px touch targets
  */
 export function getMobileControlPositions(
   screenWidth: number,
@@ -375,6 +381,12 @@ export function getMobileControlPositions(
     },
     fullscreenButton: {
       x: screenWidth - 96,
+      y: 7,
+      width: 44,
+      height: 44
+    },
+    soundButton: {
+      x: screenWidth - 144,
       y: 7,
       width: 44,
       height: 44

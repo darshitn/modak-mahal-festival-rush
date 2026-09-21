@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../state/GameState.ts';
 import { Customer } from './Customer.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 export class PackerNPC extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Sprite;
@@ -106,6 +107,7 @@ export class CashierNPC extends Phaser.GameObjects.Container {
         );
         if (res.success) {
           frontCustomer.markServed(res.feedbackText, res.stars, res.coinsEarned, res.tipEarned);
+          audioManager.playEffect('sale');
           this.scene.events.emit('customer-sale-completed', res);
 
           // Namaste bow animation using the legacy character's base scale.

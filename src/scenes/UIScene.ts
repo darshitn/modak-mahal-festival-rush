@@ -12,6 +12,7 @@ import {
   isFullscreenSupported,
   TOUR_STEPS
 } from '../utils/mobileControls.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 export interface UpgradeModalItem {
   id: 'carry' | 'packer' | 'cashier' | 'steamer2';
@@ -37,7 +38,12 @@ export class UIScene extends Phaser.Scene {
   private mobileSummaryText!: Phaser.GameObjects.Text;
   private desktopHudContainer!: Phaser.GameObjects.Container;
 
-  // Mobile Top Bar Pause & Fullscreen Buttons
+  // Desktop Sound Toggle Button
+  public desktopSoundBtnContainer!: Phaser.GameObjects.Container;
+  private desktopSoundBg!: Phaser.GameObjects.Graphics;
+  private desktopSoundIcon!: Phaser.GameObjects.Graphics;
+
+  // Mobile Top Bar Pause, Fullscreen & Sound Buttons
   public mobilePauseBtnContainer!: Phaser.GameObjects.Container;
   private mobilePauseBg!: Phaser.GameObjects.Graphics;
   private mobilePauseLabel!: Phaser.GameObjects.Text;
@@ -46,6 +52,11 @@ export class UIScene extends Phaser.Scene {
   private mobileFullscreenBg!: Phaser.GameObjects.Graphics;
   private mobileFullscreenIcon!: Phaser.GameObjects.Graphics;
   private onFullscreenChangeHandler: (() => void) | null = null;
+
+  public mobileSoundBtnContainer!: Phaser.GameObjects.Container;
+  private mobileSoundBg!: Phaser.GameObjects.Graphics;
+  private mobileSoundIcon!: Phaser.GameObjects.Graphics;
+  private unsubscribeAudio: (() => void) | null = null;
 
   // Non-blocking Toast Notification
   private toastContainer!: Phaser.GameObjects.Container;
@@ -248,6 +259,26 @@ export class UIScene extends Phaser.Scene {
       this.togglePause();
     });
 
+    // --- Desktop Sound Toggle Button ---
+    this.desktopSoundBtnContainer = this.add.container(692, 10);
+    this.desktopSoundBg = this.add.graphics();
+    this.desktopSoundBg.fillStyle(0xfffdf7, 1);
+    this.desktopSoundBg.fillRoundedRect(0, 0, 42, 36, 8);
+    this.desktopSoundBg.lineStyle(1.5, 0x45362e, 0.6);
+    this.desktopSoundBg.strokeRoundedRect(0, 0, 42, 36, 8);
+
+    this.desktopSoundIcon = this.add.graphics();
+    this.drawSoundIcon(this.desktopSoundIcon, audioManager.isMuted);
+
+    this.desktopSoundBtnContainer.add([this.desktopSoundBg, this.desktopSoundIcon]);
+    this.desktopSoundBtnContainer.setSize(42, 36);
+    this.desktopSoundBtnContainer.setInteractive({ useHandCursor: true });
+    this.desktopSoundBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation();
+      audioManager.onFirstInteraction('desktop_sound_toggle');
+      audioManager.toggleMute();
+    });
+
     // --- Dynamic Objective Banner ---
     this.objectiveBg = this.add.graphics();
     this.objectiveText = this.add.text(screenW / 2, 76, '', {
@@ -284,6 +315,7 @@ export class UIScene extends Phaser.Scene {
       this.timerBgGraphics,
       this.timerText,
       this.pauseBtnContainer,
+      this.desktopSoundBtnContainer,
       this.objectiveBg,
       this.objectiveText,
       this.announcementContainer
@@ -357,6 +389,28 @@ export class UIScene extends Phaser.Scene {
     this.mobileFullscreenBtnContainer.setDepth(5500);
     this.mobileFullscreenBtnContainer.setVisible(false);
 
+    // Mobile Top Bar Sound Toggle Button (min 44x44 touch hit area)
+    this.mobileSoundBtnContainer = this.add.container(screenW - 144, 7);
+    this.mobileSoundBg = this.add.graphics();
+    this.mobileSoundBg.fillStyle(0xfffdf7, 1);
+    this.mobileSoundBg.fillRoundedRect(0, 0, 42, 38, 8);
+    this.mobileSoundBg.lineStyle(1.5, 0x45362e, 0.65);
+    this.mobileSoundBg.strokeRoundedRect(0, 0, 42, 38, 8);
+
+    this.mobileSoundIcon = this.add.graphics();
+    this.drawSoundIcon(this.mobileSoundIcon, audioManager.isMuted);
+
+    this.mobileSoundBtnContainer.add([this.mobileSoundBg, this.mobileSoundIcon]);
+    this.mobileSoundBtnContainer.setSize(44, 44);
+    this.mobileSoundBtnContainer.setInteractive({ useHandCursor: true });
+    this.mobileSoundBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation();
+      audioManager.onFirstInteraction('mobile_sound_toggle');
+      audioManager.toggleMute();
+    });
+    this.mobileSoundBtnContainer.setDepth(5500);
+    this.mobileSoundBtnContainer.setVisible(false);
+
     // Non-blocking toast notification container
     this.toastContainer = this.add.container(screenW / 2, 76);
     this.toastBg = this.add.graphics();
@@ -389,7 +443,7 @@ export class UIScene extends Phaser.Scene {
     this.controlsText = this.add.text(
       screenW / 2,
       screenH - 20,
-      'Move: WASD/Arrows • Interact: Walk close/E • Pause: P/Esc',
+      'Move: WASD/Arrows • Interact: Walk close/E • Pause: P/Esc • Sound: M',
       {
         fontFamily: 'Outfit, sans-serif',
         fontSize: '12px',
@@ -440,6 +494,12 @@ export class UIScene extends Phaser.Scene {
     this.updateHUD();
     this.updateResponsiveHud(this.scale.gameSize);
     this.scale.on(Phaser.Scale.Events.RESIZE, this.updateResponsiveHud, this);
+
+    // Subscribe to AudioManager mute changes to keep icons synchronized
+    this.unsubscribeAudio = audioManager.subscribe((muted: boolean) => {
+      if (this.desktopSoundIcon) this.drawSoundIcon(this.desktopSoundIcon, muted);
+      if (this.mobileSoundIcon) this.drawSoundIcon(this.mobileSoundIcon, muted);
+    });
 
     // Show opening station tour on initial onboarding, but do not force returning players
     const tourSeen = typeof localStorage !== 'undefined' && localStorage.getItem('modak_mahal_tour_seen') === 'true';
@@ -497,6 +557,10 @@ export class UIScene extends Phaser.Scene {
       this.toastTimerEvent.remove();
       this.toastTimerEvent = null;
     }
+    if (this.unsubscribeAudio) {
+      this.unsubscribeAudio();
+      this.unsubscribeAudio = null;
+    }
     this.resetJoystick();
     this.scale.off(Phaser.Scale.Events.RESIZE, this.updateResponsiveHud, this);
   }
@@ -541,6 +605,11 @@ export class UIScene extends Phaser.Scene {
     }
     if (this.mobileFullscreenBtnContainer) {
       this.mobileFullscreenBtnContainer.setVisible(
+        isMobile && !this.isResultsModalOpen && !this.isTourActive && !this.isGuideModalOpen && !this.isUpgradeModalOpen
+      );
+    }
+    if (this.mobileSoundBtnContainer) {
+      this.mobileSoundBtnContainer.setVisible(
         isMobile && !this.isResultsModalOpen && !this.isTourActive && !this.isGuideModalOpen && !this.isUpgradeModalOpen
       );
     }
@@ -1087,7 +1156,7 @@ export class UIScene extends Phaser.Scene {
       }
       if (this.mobileSummaryText) {
         this.mobileSummaryText.setPosition(12, 30);
-        this.mobileSummaryText.setWordWrapWidth(screenWidth - 105);
+        this.mobileSummaryText.setWordWrapWidth(screenWidth - 155);
       }
       const pos = getMobileControlPositions(screenWidth, screenHeight, isPortrait);
       if (this.mobilePauseBtnContainer) {
@@ -1095,6 +1164,9 @@ export class UIScene extends Phaser.Scene {
       }
       if (this.mobileFullscreenBtnContainer) {
         this.mobileFullscreenBtnContainer.setPosition(pos.fullscreenButton.x, pos.fullscreenButton.y);
+      }
+      if (this.mobileSoundBtnContainer) {
+        this.mobileSoundBtnContainer.setPosition(pos.soundButton.x, pos.soundButton.y);
       }
       if (this.toastContainer) {
         this.toastContainer.setPosition(screenWidth / 2, isPortrait ? 76 : 108);
@@ -1182,7 +1254,9 @@ export class UIScene extends Phaser.Scene {
     this.isPauseModalOpen = true;
     if (this.campaignState) {
       this.campaignState.isPaused = true;
+      this.campaignState.notify();
     }
+    audioManager.onPause();
 
     const shop = this.scene.get('ShopScene') as ShopScene;
     if (shop?.player) {
@@ -1200,7 +1274,10 @@ export class UIScene extends Phaser.Scene {
     this.isPauseModalOpen = false;
     if (this.campaignState) {
       this.campaignState.isPaused = false;
+      this.campaignState.notify();
     }
+    audioManager.onResume();
+
     const shop = this.scene.get('ShopScene') as ShopScene;
     if (shop?.player) {
       shop.player.isInputBlocked = false;
@@ -1368,6 +1445,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   public nextTourStep() {
+    audioManager.onFirstInteraction('tour_next');
     if (!this.isTourActive) return;
     if (this.currentTourStepIndex < TOUR_STEPS.length - 1) {
       this.renderTourStep(this.currentTourStepIndex + 1);
@@ -1377,6 +1455,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   public prevTourStep() {
+    audioManager.onFirstInteraction('tour_prev');
     if (!this.isTourActive) return;
     if (this.currentTourStepIndex > 0) {
       this.renderTourStep(this.currentTourStepIndex - 1);
@@ -1384,6 +1463,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   public closeTour() {
+    audioManager.onFirstInteraction('tour_close');
     if (!this.isTourActive && !this.isGuideModalOpen) return;
     this.isTourActive = false;
     this.isGuideModalOpen = false;
@@ -2163,10 +2243,20 @@ export class UIScene extends Phaser.Scene {
 
     const isP = event.code === 'KeyP' || event.key === 'p' || event.key === 'P';
     const isEsc = event.code === 'Escape' || event.key === 'Escape';
+    const isM = event.code === 'KeyM' || event.key === 'm' || event.key === 'M';
+
+    // First user key interaction triggers lazy audio load
+    audioManager.onFirstInteraction('keydown');
 
     // A. Results modal open:
     // Ignore P and Escape unless an explicitly supported results action exists.
     if (this.isResultsModalOpen) {
+      return;
+    }
+
+    // Sound toggle key 'M': accessible anytime during tour, upgrade, pause, or normal gameplay
+    if (isM) {
+      audioManager.toggleMute();
       return;
     }
 
@@ -2309,6 +2399,7 @@ export class UIScene extends Phaser.Scene {
     if (item.isUnlocked()) return;
 
     if (item.buyAction()) {
+      audioManager.playEffect('upgrade');
       const shop = this.scene.get('ShopScene') as ShopScene;
       if (shop?.upgradeStation) {
         shop.upgradeStation.playPurchaseBounce();
@@ -2391,6 +2482,58 @@ export class UIScene extends Phaser.Scene {
       this.mobileFullscreenIcon.lineTo(23, 24);
       this.mobileFullscreenIcon.lineTo(23, 20);
       this.mobileFullscreenIcon.strokePath();
+    }
+  }
+
+  public drawSoundIcon(graphics: Phaser.GameObjects.Graphics, isMuted: boolean) {
+    if (!graphics) return;
+    graphics.clear();
+
+    const cx = 21;
+    const cy = 19;
+
+    if (!isMuted) {
+      // Speaker base rectangle
+      graphics.fillStyle(0x45362e, 0.95);
+      graphics.fillRect(cx - 8, cy - 4, 4, 8);
+
+      // Speaker horn polygon
+      graphics.beginPath();
+      graphics.moveTo(cx - 4, cy - 4);
+      graphics.lineTo(cx + 1, cy - 8);
+      graphics.lineTo(cx + 1, cy + 8);
+      graphics.lineTo(cx - 4, cy + 4);
+      graphics.closePath();
+      graphics.fillPath();
+
+      // Sound waves (2 concentric arcs)
+      graphics.lineStyle(1.8, 0xd97706, 0.95);
+      graphics.beginPath();
+      graphics.arc(cx + 1, cy, 5, -Phaser.Math.DEG_TO_RAD * 42, Phaser.Math.DEG_TO_RAD * 42, false);
+      graphics.strokePath();
+
+      graphics.beginPath();
+      graphics.arc(cx + 1, cy, 9, -Phaser.Math.DEG_TO_RAD * 42, Phaser.Math.DEG_TO_RAD * 42, false);
+      graphics.strokePath();
+    } else {
+      // Muted speaker (subdued color)
+      graphics.fillStyle(0x795548, 0.75);
+      graphics.fillRect(cx - 8, cy - 4, 4, 8);
+
+      graphics.beginPath();
+      graphics.moveTo(cx - 4, cy - 4);
+      graphics.lineTo(cx + 1, cy - 8);
+      graphics.lineTo(cx + 1, cy + 8);
+      graphics.lineTo(cx - 4, cy + 4);
+      graphics.closePath();
+      graphics.fillPath();
+
+      // Crisp red diagonal slash
+      graphics.lineStyle(2.2, 0xd32f2f, 1);
+      graphics.beginPath();
+      graphics.moveTo(cx - 8, cy - 8);
+      graphics.lineTo(cx + 9, cy + 9);
+      graphics.strokePath();
     }
   }
 

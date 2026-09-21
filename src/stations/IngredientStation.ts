@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BaseStation } from './BaseStation.ts';
 import { GameState } from '../state/GameState.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 // Visual scale and alignment constants for illustrated supply shelf v2:
 // Asset 1387x1134, visible bounds [100, 75, 1286, 1059] (visible w=1187, h=985)
@@ -159,6 +160,7 @@ export class IngredientStation extends BaseStation {
 
   public attemptBuy(): boolean {
     if (this.gameState.buyBundle()) {
+      audioManager.playEffect('purchase');
       this.scene.tweens.add({
         targets: this.mainSprite,
         scaleY: SHELF_SCALE * 1.08,
@@ -174,6 +176,7 @@ export class IngredientStation extends BaseStation {
       this.updateStockDisplay();
       return true;
     }
+    audioManager.playEffect('error');
     return false;
   }
 

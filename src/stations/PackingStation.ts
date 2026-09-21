@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BaseStation } from './BaseStation.ts';
 import { GameState } from '../state/GameState.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 // Visual scale and alignment constants for illustrated packing bench:
 // Asset 1568x1003, visible bounds [145, 112, 1446, 917] (visible w=1302, h=806)
@@ -21,6 +22,7 @@ export class PackingStation extends BaseStation {
   private outputBadgeText: Phaser.GameObjects.Text;
   private progressBarGraphics: Phaser.GameObjects.Graphics;
   private collectCooldown = 0;
+  private wasPacking = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, gameState: GameState) {
     super(scene, x, y, 'raster_packing_bench', 'Packing Table', gameState, 65);
@@ -81,6 +83,17 @@ export class PackingStation extends BaseStation {
     } else {
       this.drawCompactProgressBar(pt.outputBoxes > 0 ? 1 : 0, 0x4caf50);
     }
+    if (this.wasPacking && !pt.isPacking && pt.outputBoxes > 0) {
+      audioManager.playEffect('pack');
+      this.scene.tweens.add({
+        targets: this.outputBoxesSprite,
+        scaleX: 0.52,
+        scaleY: 0.52,
+        duration: 140,
+        yoyo: true
+      });
+    }
+    this.wasPacking = pt.isPacking;
     this.drawSubtleRing(this.isPlayerInside);
   }
 

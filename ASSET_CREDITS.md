@@ -123,3 +123,34 @@ Removed unused preload: `station_supply_shelf-v1.png` (1.39 MB) — saves an add
 
 **Net startup artwork transfer: ~13.4 MB → 1.43 MB (target was < 4 MB ✅)**
 
+## 7. Audio Assets & Music Provenance (RESPONSIVE_AUDIO_PASS)
+
+- **Theme Music**: `modak-mahal-theme.mp3` (`public/assets/audio/modak-mahal-theme.mp3`)
+  - **File Size**: 1,282,560 bytes (~1.22 MB / 1.28 MB)
+  - **Track Title**: Jugalbandhi (Veena Flute Tabla)
+  - **Original File**: `saseendran-jugalbandhi-veena-flute-tabla-378047.mp3`
+  - **Artist / Composer**: Saseendran (Pixabay user: `saseendran`)
+  - **Source URL**: `https://pixabay.com/music/search/jugalbandhi%20veena%20flute%20tabla/` (Track ID: `378047`)
+  - **License**: Pixabay Content License (Free for commercial and non-commercial use across print and digital, royalty-free, no attribution strictly required but respectfully credited here)
+  - **Loading Strategy**: Lazy-loaded strictly upon player's first explicit interaction (Play on the opening tour, first keypress, first touch, or first game action). Never preloaded in BootScene to preserve first-load performance.
+  - **Adaptive Behaviour**:
+    - Loops seamlessly at calm 18% default volume during initial onboarding.
+    - Smoothly fades from 18% to 25% over 800ms when the festival timer starts after the first sale. Playback speed remains untouched (1.0).
+    - Pauses immediately when game pauses; resumes only when gameplay resumes.
+    - Smoothly fades out on victory and defeat.
+  - **Sound Toggle Control**:
+    - Embedded in both desktop HUD (beside pause) and mobile HUD (beside fullscreen).
+    - Touch and keyboard accessible (`KeyM` shortcut).
+    - Remembers mute state across visits in `localStorage` under `modak_mahal_audio_muted`.
+    - Defaults to muted only if browser autoplay policy blocks audio.
+
+- **Victory Chime**: Procedural Web Audio Synthesis
+  - **File Size**: 0 bytes (no network transfer, 100% offline generated)
+  - **Technique**: Web Audio API oscillator synthesis generating a joyful 4-note bell arpeggio (G5: 783.99Hz, C6: 1046.50Hz, E6: 1318.51Hz, G6: 1567.98Hz) with exponential gain envelopes.
+  - **License**: Original procedural synthesis (MIT/Apache 2.0 matching project).
+
+- **Game Feel SFX**: Procedural Web Audio Synthesis (GAME_FEEL_SFX_PASS)
+  - **File Size**: 0 bytes (no new media files or startup network requests)
+  - **Cues**: Purchase, steamer loading, cooked-modak ready, packing completion, customer sale/tip, upgrade confirmation, Pandal Dispatch deposit, and an invalid-action cue.
+  - **Technique**: Short oscillator and gain-envelope sequences in `src/utils/audioManager.ts`, governed by the same explicit-interaction gate and persistent mute preference as the theme music.
+  - **Spam Protection**: Per-cue cooldowns prevent duplicate sound layers from automatic station stay-loops.

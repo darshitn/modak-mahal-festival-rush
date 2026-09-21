@@ -301,6 +301,11 @@ describe('Mobile Controls & Layout Helpers', () => {
       expect(pos.fullscreenButton.y).toBe(7);
       expect(pos.fullscreenButton.width).toBeGreaterThanOrEqual(44);
       expect(pos.fullscreenButton.height).toBeGreaterThanOrEqual(44);
+
+      expect(pos.soundButton.x).toBe(844 - 144);
+      expect(pos.soundButton.y).toBe(7);
+      expect(pos.soundButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.soundButton.height).toBeGreaterThanOrEqual(44);
     });
 
     it('positions portrait controls with elevated joystick and ample downward drag clearance', () => {
@@ -323,9 +328,12 @@ describe('Mobile Controls & Layout Helpers', () => {
       expect(pos.actionCard.y).toBe(844 - 175); // 669
       expect(pos.actionCard.y).toBeLessThan(pos.joystick.y - pos.joystick.radius);
 
-      // Fullscreen and pause buttons
-      expect(pos.fullscreenButton.x).toBe(390 - 96);
+      // Fullscreen, pause, and sound buttons
       expect(pos.pauseButton.x).toBe(390 - 48);
+      expect(pos.fullscreenButton.x).toBe(390 - 96);
+      expect(pos.soundButton.x).toBe(390 - 144);
+      expect(pos.soundButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.soundButton.height).toBeGreaterThanOrEqual(44);
     });
 
     it('guards against crowding top HUD on short landscape screens', () => {

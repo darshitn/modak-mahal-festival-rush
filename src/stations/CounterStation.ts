@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BaseStation } from './BaseStation.ts';
 import { GameState } from '../state/GameState.ts';
 import { Customer } from '../entities/Customer.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 // Visual scale and alignment constants for illustrated service counter:
 // Asset 1683x935, visible bounds [121, 241, 1581, 852] (visible w=1461, h=612)
@@ -106,6 +107,7 @@ export class CounterStation extends BaseStation {
   public attemptDepositCarriedBoxes(): boolean {
     const deposited = this.gameState.depositBoxesToCounter();
     if (deposited) {
+      audioManager.playEffect('load');
       this.scene.tweens.add({
         targets: this.mainSprite,
         scaleY: COUNTER_SCALE * 1.08,
@@ -115,4 +117,5 @@ export class CounterStation extends BaseStation {
     }
     return deposited;
   }
+
 }

@@ -3,6 +3,7 @@ import { BaseStation } from './BaseStation.ts';
 import { GameState } from '../state/GameState.ts';
 import { CampaignState } from '../state/CampaignState.ts';
 import { Player } from '../entities/Player.ts';
+import { audioManager } from '../utils/audioManager.ts';
 
 export class DispatchStation extends BaseStation {
   private campaignState: CampaignState;
@@ -247,6 +248,7 @@ export class DispatchStation extends BaseStation {
 
     const accepted = this.campaignState.depositBoxesToDispatch(carried.count);
     if (accepted > 0) {
+      audioManager.playEffect('dispatch');
       carried.count -= accepted;
       if (carried.count <= 0) {
         carried.type = null;
@@ -259,6 +261,13 @@ export class DispatchStation extends BaseStation {
         targets: this.mainSprite,
         scaleY: 0.55,
         duration: 100,
+        yoyo: true
+      });
+      this.scene.tweens.add({
+        targets: this.crateBadge,
+        scaleX: 1.12,
+        scaleY: 1.12,
+        duration: 120,
         yoyo: true
       });
       return true;
