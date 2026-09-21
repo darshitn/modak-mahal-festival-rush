@@ -10,3 +10,25 @@ scratch/
 coverage/
 playwright-report/
 test-results/
+deliverables/
+
+# Local agent coordination and working documents; keep them on disk.
+AI_INSTRUCTIONS.md
+ANTIGRAVITY_START_HERE.md
+ARCHITECTURE.md
+MODAK_MAHAL_REDESIGN_PLAN.md
+MODEL_HANDOFF.md
+PROJECT.md
+PROJECT_STATUS.md
+REDESIGN_PHASE_REPORT.md
+ROADMAP.md
+TASKS.md
+details.md
+public/assets/generated/GENERATION_NOTES.md
+
+# Historical visual drafts and browser proof screenshots, unused by the game.
+public/assets/generated/shot_*.png
+public/assets/generated/bg_hall_illustrated-*.png
+!public/assets/generated/bg_hall_illustrated-v3-clean.png
+public/assets/generated/pandal_ganesha-v2-hall-preview.png
+public/assets/reference_hall.png
