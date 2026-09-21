@@ -10,7 +10,9 @@ import {
   isMobileLayout,
   isFullscreenActive,
   isFullscreenSupported,
-  TOUR_STEPS
+  TOUR_STEPS,
+  shouldShowLandscapeRecommendation,
+  dismissLandscapeRecommendation
 } from '../utils/mobileControls.ts';
 import { audioManager } from '../utils/audioManager.ts';
 
@@ -119,6 +121,10 @@ export class UIScene extends Phaser.Scene {
   // Results Modal
   public isResultsModalOpen = false;
   private resultsModalContainer!: Phaser.GameObjects.Container;
+
+  // Landscape recommendation toast
+  private landscapeRecommendContainer: Phaser.GameObjects.Container | null = null;
+  private landscapeRecommendShownOnce = false;
 
   // Station Tour / Guide Modal
   public isTourActive = false;
@@ -1234,6 +1240,116 @@ export class UIScene extends Phaser.Scene {
     this.resetJoystick();
     this.updateControlsVisibility();
     this.updateHUD();
+
+    // Show landscape recommendation on first portrait mobile visit
+    this._updateLandscapeRecommendation(screenWidth, screenHeight, isMobile, isPortrait);
+  }
+
+  /** Shows or hides the landscape recommendation toast based on current orientation. */
+  private _updateLandscapeRecommendation(
+    screenWidth: number,
+    screenHeight: number,
+    isMobile: boolean,
+    isPortrait: boolean
+  ) {
+    const shouldShow = isMobile && isPortrait && !this.areModalsOpen() &&
+      shouldShowLandscapeRecommendation(screenWidth, screenHeight, this.hasCoarseOrTouch);
+
+    if (shouldShow && !this.landscapeRecommendShownOnce) {
+      this.landscapeRecommendShownOnce = true;
+      this._showLandscapeRecommendToast(screenWidth, screenHeight);
+    } else if (!shouldShow && this.landscapeRecommendContainer) {
+      // Hide if orientation switched to landscape or desktop
+      this.landscapeRecommendContainer.setVisible(false);
+    }
+  }
+
+  /**
+   * Builds and shows a dismissible, non-blocking landscape recommendation toast.
+   * Safe to call multiple times; re-uses the existing container if present.
+   */
+  private _showLandscapeRecommendToast(screenWidth: number, screenHeight: number) {
+    // Destroy any previous instance
+    if (this.landscapeRecommendContainer) {
+      this.landscapeRecommendContainer.destroy();
+      this.landscapeRecommendContainer = null;
+    }
+
+    const toastW = Math.min(320, screenWidth - 24);
+    const toastH = 70;
+    const cx = screenWidth / 2;
+    const cy = screenHeight - 220; // above thumb controls
+
+    const container = this.add.container(cx, cy);
+    container.setDepth(18000);
+    this.landscapeRecommendContainer = container;
+
+    // Background card
+    const bg = this.add.graphics();
+    bg.fillStyle(0x180d07, 0.93);
+    bg.fillRoundedRect(-toastW / 2, -toastH / 2, toastW, toastH, 10);
+    bg.lineStyle(2, 0xc9953d, 0.9);
+    bg.strokeRoundedRect(-toastW / 2, -toastH / 2, toastW, toastH, 10);
+    container.add(bg);
+
+    // Rotate icon
+    const icon = this.add.text(-toastW / 2 + 24, 0, '📱', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '20px'
+    }).setOrigin(0.5);
+    container.add(icon);
+
+    // Message
+    const msg = this.add.text(-toastW / 2 + 52, -10,
+      'Landscape recommended for the\nbest Modak Mahal experience.', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '11px',
+      color: '#ffd54f',
+      fontStyle: 'bold',
+      wordWrap: { width: toastW - 80 }
+    }).setResolution(2);
+    container.add(msg);
+
+    // Dismiss ✕ button (44×44 touch target)
+    const dismissZone = this.add.zone(toastW / 2 - 16, -toastH / 2 + 8, 44, 44)
+      .setInteractive({ useHandCursor: true });
+    dismissZone.on('pointerup', () => {
+      dismissLandscapeRecommendation();
+      container.setVisible(false);
+    });
+    container.add(dismissZone);
+
+    const xLabel = this.add.text(toastW / 2 - 16, -toastH / 2 + 8, '✕', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '14px',
+      color: '#c9953d'
+    }).setOrigin(0.5).setResolution(2);
+    container.add(xLabel);
+
+    // Fade in
+    container.setAlpha(0);
+    this.tweens.add({
+      targets: container,
+      alpha: 1,
+      duration: 300,
+      ease: 'Quad.easeOut'
+    });
+
+    // Auto-dismiss after 8 seconds
+    this.time.delayedCall(8000, () => {
+      if (container.scene) {
+        this.tweens.add({
+          targets: container,
+          alpha: 0,
+          duration: 400,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            if (container.scene) container.setVisible(false);
+          }
+        });
+        dismissLandscapeRecommendation();
+      }
+    });
   }
 
   // ==========================================

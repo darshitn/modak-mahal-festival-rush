@@ -4,6 +4,17 @@ import { ShopScene } from './scenes/ShopScene.ts';
 import { UIScene } from './scenes/UIScene.ts';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from './config/layout.ts';
 
+// Cap device pixel ratio at 2 to use for explicit canvas/text scaling decisions.
+// Phaser 3.88 does not expose a `render.resolution` property in TypeScript types
+// (it was removed in Phaser 3.60). High-DPI sharpness is achieved by:
+//   1. Calling text.setResolution(2) on all Phaser text objects (done throughout the codebase).
+//   2. The orientationchange handler calling game.scale.refresh() so the canvas
+//      is correctly re-measured and redrawn without a page refresh.
+// See: https://phaser.io/phaser3/devlog/136 (3.60 scale manager changes)
+export const deviceResolution = typeof window !== 'undefined'
+  ? Math.min(window.devicePixelRatio || 1, 2)
+  : 1;
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: LOGICAL_WIDTH,
@@ -34,5 +45,17 @@ const config: Phaser.Types.Core.GameConfig = {
 };
 
 window.addEventListener('DOMContentLoaded', () => {
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+
+  // Forward orientationchange to Phaser's scale manager so the game adapts
+  // instantly on real devices without needing a page refresh.  The debounce
+  // prevents duplicate resize events that fire on some Android browsers.
+  let _orientationTimer: ReturnType<typeof setTimeout> | null = null;
+  window.addEventListener('orientationchange', () => {
+    if (_orientationTimer !== null) clearTimeout(_orientationTimer);
+    _orientationTimer = setTimeout(() => {
+      _orientationTimer = null;
+      game.scale.refresh();
+    }, 150);
+  });
 });

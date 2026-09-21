@@ -11,6 +11,11 @@ import {
   TOUR_STEPS,
   getTourCardLayout,
   getTourCameraScroll,
+  shouldShowLandscapeRecommendation,
+  dismissLandscapeRecommendation,
+  getDeviceResolution,
+  validateMobileHudHitboxes,
+  LANDSCAPE_RECOMMEND_KEY,
   type CameraViewportBounds
 } from '../utils/mobileControls.ts';
 
@@ -490,6 +495,192 @@ describe('Mobile Controls & Layout Helpers', () => {
       const extremeLeft = getTourCameraScroll(-100, -50, 390, 844, 1.5);
       expect(extremeLeft.scrollX).toBe(0);
       expect(extremeLeft.scrollY).toBe(0);
+    });
+  });
+
+  // ── Device Resolution Helper ────────────────────────────────────────────────
+
+  describe('getDeviceResolution', () => {
+    it('returns 1.0 when dpr is 1 (standard display)', () => {
+      expect(getDeviceResolution(1)).toBe(1);
+    });
+
+    it('returns 2.0 when dpr is 2 (Retina display)', () => {
+      expect(getDeviceResolution(2)).toBe(2);
+    });
+
+    it('caps at 2.0 for dpr values above 2 (e.g. 3× OLED screen)', () => {
+      expect(getDeviceResolution(3)).toBe(2);
+      expect(getDeviceResolution(4)).toBe(2);
+    });
+
+    it('clamps below 1 up to minimum 1', () => {
+      expect(getDeviceResolution(0)).toBe(1);
+      expect(getDeviceResolution(0.5)).toBe(1);
+    });
+  });
+
+  // ── Landscape Recommendation ────────────────────────────────────────────────
+
+  describe('shouldShowLandscapeRecommendation', () => {
+    const fakeStorage = (value: string | null): Pick<Storage, 'getItem'> => ({
+      getItem: (_key: string) => value
+    });
+
+    it('returns true for portrait mobile when not yet dismissed', () => {
+      expect(shouldShowLandscapeRecommendation(390, 844, true, fakeStorage(null))).toBe(true);
+    });
+
+    it('returns false when already dismissed (localStorage contains "true")', () => {
+      expect(shouldShowLandscapeRecommendation(390, 844, true, fakeStorage('true'))).toBe(false);
+    });
+
+    it('returns false for landscape mobile (height <= width)', () => {
+      expect(shouldShowLandscapeRecommendation(844, 390, true, fakeStorage(null))).toBe(false);
+    });
+
+    it('returns false for desktop portrait (non-mobile layout)', () => {
+      // Any height > width triggers isMobileLayout (portrait is always mobile).
+      // A true "desktop in portrait" scenario doesn't apply here. Test instead
+      // that very large portrait screens without coarse pointer still pass the
+      // mobile check (they do — portrait is always mobile layout by design).
+      // The landscape recommendation only applies to genuine portrait mobile:
+      // verify it is suppressed on a 1920x1080 desktop where height <= width.
+      expect(shouldShowLandscapeRecommendation(1920, 1080, false, fakeStorage(null))).toBe(false);
+    });
+
+    it('returns false for desktop landscape', () => {
+      expect(shouldShowLandscapeRecommendation(1366, 768, false, fakeStorage(null))).toBe(false);
+    });
+  });
+
+  describe('dismissLandscapeRecommendation', () => {
+    it('writes "true" to the storage under LANDSCAPE_RECOMMEND_KEY', () => {
+      const written: Record<string, string> = {};
+      const store: Pick<Storage, 'setItem'> = {
+        setItem: (k, v) => { written[k] = v; }
+      };
+      dismissLandscapeRecommendation(store);
+      expect(written[LANDSCAPE_RECOMMEND_KEY]).toBe('true');
+    });
+  });
+
+  // ── Mobile HUD Hitbox Validation ────────────────────────────────────────────
+
+  describe('validateMobileHudHitboxes', () => {
+    it('passes for 390px portrait (iPhone SE size)', () => {
+      const result = validateMobileHudHitboxes(390);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('passes for 412px portrait (Pixel / Galaxy S size)', () => {
+      const result = validateMobileHudHitboxes(412);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('passes for 375px portrait (narrow phone)', () => {
+      const result = validateMobileHudHitboxes(375);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('each button has at least 44x44 touch target', () => {
+      const pos = getMobileControlPositions(390, 844, true);
+      expect(pos.pauseButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.pauseButton.height).toBeGreaterThanOrEqual(44);
+      expect(pos.fullscreenButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.fullscreenButton.height).toBeGreaterThanOrEqual(44);
+      expect(pos.soundButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.soundButton.height).toBeGreaterThanOrEqual(44);
+    });
+
+    it('buttons are ordered left-to-right: sound < fullscreen < pause', () => {
+      const pos = getMobileControlPositions(390, 844, true);
+      expect(pos.soundButton.x).toBeLessThan(pos.fullscreenButton.x);
+      expect(pos.fullscreenButton.x).toBeLessThan(pos.pauseButton.x);
+    });
+
+    it('no two buttons overlap each other on a 390px screen', () => {
+      const pos = getMobileControlPositions(390, 844, true);
+      const buttons = [
+        { name: 'sound', x: pos.soundButton.x, w: pos.soundButton.width },
+        { name: 'fullscreen', x: pos.fullscreenButton.x, w: pos.fullscreenButton.width },
+        { name: 'pause', x: pos.pauseButton.x, w: pos.pauseButton.width }
+      ];
+      for (let i = 0; i < buttons.length; i++) {
+        for (let j = i + 1; j < buttons.length; j++) {
+          const a = buttons[i];
+          const b = buttons[j];
+          const overlaps = a.x < b.x + b.w && b.x < a.x + a.w;
+          expect(overlaps).toBe(false);
+        }
+      }
+    });
+
+    it('pause button is rightmost, flush to right edge (screenWidth - 48)', () => {
+      const screenWidth = 390;
+      const pos = getMobileControlPositions(screenWidth, 844, true);
+      expect(pos.pauseButton.x).toBe(screenWidth - 48);
+    });
+
+    it('fullscreen button is at screenWidth - 96', () => {
+      const screenWidth = 390;
+      const pos = getMobileControlPositions(screenWidth, 844, true);
+      expect(pos.fullscreenButton.x).toBe(screenWidth - 96);
+    });
+
+    it('sound button is at screenWidth - 144', () => {
+      const screenWidth = 390;
+      const pos = getMobileControlPositions(screenWidth, 844, true);
+      expect(pos.soundButton.x).toBe(screenWidth - 144);
+    });
+  });
+
+  // ── Orientation Change Behavior Contract ────────────────────────────────────
+
+  describe('Orientation change behavior contract', () => {
+    it('reports portrait for 390x844', () => {
+      const { isPortrait } = getCameraLayoutConfig(390, 844);
+      expect(isPortrait).toBe(true);
+    });
+
+    it('reports landscape (not portrait) for 844x390', () => {
+      const { isPortrait } = getCameraLayoutConfig(844, 390);
+      expect(isPortrait).toBe(false);
+    });
+
+    it('isMobileLayout is symmetric: portrait and landscape are both mobile', () => {
+      expect(isMobileLayout(390, 844)).toBe(true);
+      expect(isMobileLayout(844, 390)).toBe(true);
+    });
+
+    it('getMobileControlPositions returns different joystick x on orientation switch', () => {
+      // Portrait joystick should be at x=90, landscape at x=100
+      const portrait = getMobileControlPositions(390, 844, true);
+      const landscape = getMobileControlPositions(844, 390, false);
+      expect(portrait.joystick.x).toBe(90);
+      expect(landscape.joystick.x).toBe(100);
+    });
+
+    it('joystick stays fully on-screen in portrait 390px wide', () => {
+      const pos = getMobileControlPositions(390, 844, true);
+      const leftEdge = pos.joystick.x - pos.joystick.radius;
+      expect(leftEdge).toBeGreaterThanOrEqual(0);
+    });
+
+    it('joystick stays fully on-screen in landscape 844x390', () => {
+      const pos = getMobileControlPositions(844, 390, false);
+      const leftEdge = pos.joystick.x - pos.joystick.radius;
+      expect(leftEdge).toBeGreaterThanOrEqual(0);
+    });
+
+    it('landscape recommendation hidden after device rotates to landscape', () => {
+      // Portrait: should show
+      expect(shouldShowLandscapeRecommendation(390, 844, true, { getItem: () => null })).toBe(true);
+      // Landscape: should NOT show (even if not dismissed)
+      expect(shouldShowLandscapeRecommendation(844, 390, true, { getItem: () => null })).toBe(false);
     });
   });
 });

@@ -551,3 +551,100 @@ export function getTourCameraScroll(
 
   return { scrollX, scrollY };
 }
+
+// ─── Landscape Recommendation ────────────────────────────────────────────────
+
+/** localStorage key that records whether the landscape nudge has been shown. */
+export const LANDSCAPE_RECOMMEND_KEY = 'modak_mahal_landscape_recommended';
+
+/**
+ * Returns true when the landscape recommendation should be shown.
+ * Conditions: portrait orientation, mobile device, and not yet dismissed.
+ */
+export function shouldShowLandscapeRecommendation(
+  width: number,
+  height: number,
+  hasCoarsePointerOrTouch = false,
+  storage?: Pick<Storage, 'getItem'>
+): boolean {
+  if (!isMobileLayout(width, height, hasCoarsePointerOrTouch)) return false;
+  if (height <= width) return false; // already landscape
+  const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  if (!store) return false;
+  return store.getItem(LANDSCAPE_RECOMMEND_KEY) !== 'true';
+}
+
+/**
+ * Records that the landscape recommendation has been shown / dismissed so it
+ * will not be displayed again on future visits.
+ */
+export function dismissLandscapeRecommendation(
+  storage?: Pick<Storage, 'setItem'>
+): void {
+  const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  if (store) {
+    store.setItem(LANDSCAPE_RECOMMEND_KEY, 'true');
+  }
+}
+
+// ─── Device Resolution Helper ─────────────────────────────────────────────────
+
+/**
+ * Returns the Phaser render resolution for this device: devicePixelRatio capped
+ * at 2 to avoid the GPU cost of a 3× backing buffer on Ultra-HD screens.
+ * Pass a custom value in tests by providing `dpr`.
+ */
+export function getDeviceResolution(dpr?: number): number {
+  const raw = dpr ?? (typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1);
+  return Math.min(Math.max(1, raw), 2);
+}
+
+// ─── Mobile HUD Hitbox Validation ────────────────────────────────────────────
+
+/**
+ * Returns true when the three mobile top-bar buttons (sound, fullscreen, pause)
+ * each have independent, non-overlapping 44×44 logical-pixel touch targets that
+ * are fully on-screen for the given screen width.
+ *
+ * This is a pure validation helper; UIScene positions the containers according
+ * to getMobileControlPositions() and this confirms correctness in unit tests.
+ */
+export function validateMobileHudHitboxes(
+  screenWidth: number
+): { valid: boolean; errors: string[] } {
+  const pos = getMobileControlPositions(screenWidth, 844, true); // portrait sizes
+  const errors: string[] = [];
+
+  const buttons = [
+    { name: 'soundButton', ...pos.soundButton },
+    { name: 'fullscreenButton', ...pos.fullscreenButton },
+    { name: 'pauseButton', ...pos.pauseButton }
+  ];
+
+  for (const btn of buttons) {
+    // Minimum 44×44 touch target
+    if (btn.width < 44) errors.push(`${btn.name} width ${btn.width} < 44`);
+    if (btn.height < 44) errors.push(`${btn.name} height ${btn.height} < 44`);
+
+    // Button must be fully on-screen
+    if (btn.x < 0) errors.push(`${btn.name} left edge x=${btn.x} < 0`);
+    if (btn.x + btn.width > screenWidth) {
+      errors.push(`${btn.name} right edge ${btn.x + btn.width} > ${screenWidth}`);
+    }
+  }
+
+  // Buttons must not overlap each other (simple pairwise check along x-axis
+  // since they share the same y row)
+  for (let i = 0; i < buttons.length; i++) {
+    for (let j = i + 1; j < buttons.length; j++) {
+      const a = buttons[i];
+      const b = buttons[j];
+      const aRight = a.x + a.width;
+      const bRight = b.x + b.width;
+      const overlaps = a.x < bRight && b.x < aRight;
+      if (overlaps) errors.push(`${a.name} overlaps ${b.name}`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
