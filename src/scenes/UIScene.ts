@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { topLeftButtonHitArea } from '../utils/buttonHitArea';
 import { GameState } from '../state/GameState.ts';
 import { CampaignState } from '../state/CampaignState.ts';
 import { ShopScene } from './ShopScene.ts';
@@ -259,7 +260,7 @@ export class UIScene extends Phaser.Scene {
 
     this.pauseBtnContainer.add([pauseBg, pauseLabel]);
     this.pauseBtnContainer.setSize(42, 36);
-    this.pauseBtnContainer.setInteractive({ useHandCursor: true });
+    this.pauseBtnContainer.setInteractive({ useHandCursor: true, hitArea: topLeftButtonHitArea(42, 36), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
     this.pauseBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event?.stopPropagation();
       this.togglePause();
@@ -278,7 +279,7 @@ export class UIScene extends Phaser.Scene {
 
     this.desktopSoundBtnContainer.add([this.desktopSoundBg, this.desktopSoundIcon]);
     this.desktopSoundBtnContainer.setSize(42, 36);
-    this.desktopSoundBtnContainer.setInteractive({ useHandCursor: true });
+    this.desktopSoundBtnContainer.setInteractive({ useHandCursor: true, hitArea: topLeftButtonHitArea(42, 36), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
     this.desktopSoundBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event?.stopPropagation();
       audioManager.onFirstInteraction('desktop_sound_toggle');
@@ -366,7 +367,7 @@ export class UIScene extends Phaser.Scene {
 
     this.mobilePauseBtnContainer.add([this.mobilePauseBg, this.mobilePauseLabel]);
     this.mobilePauseBtnContainer.setSize(44, 44);
-    this.mobilePauseBtnContainer.setInteractive({ useHandCursor: true });
+    this.mobilePauseBtnContainer.setInteractive({ useHandCursor: true, hitArea: topLeftButtonHitArea(44, 44), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
     this.mobilePauseBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event?.stopPropagation();
       this.togglePause();
@@ -387,7 +388,7 @@ export class UIScene extends Phaser.Scene {
 
     this.mobileFullscreenBtnContainer.add([this.mobileFullscreenBg, this.mobileFullscreenIcon]);
     this.mobileFullscreenBtnContainer.setSize(44, 44);
-    this.mobileFullscreenBtnContainer.setInteractive({ useHandCursor: true });
+    this.mobileFullscreenBtnContainer.setInteractive({ useHandCursor: true, hitArea: topLeftButtonHitArea(44, 44), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
     this.mobileFullscreenBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event?.stopPropagation();
       this.toggleFullscreen();
@@ -408,7 +409,7 @@ export class UIScene extends Phaser.Scene {
 
     this.mobileSoundBtnContainer.add([this.mobileSoundBg, this.mobileSoundIcon]);
     this.mobileSoundBtnContainer.setSize(44, 44);
-    this.mobileSoundBtnContainer.setInteractive({ useHandCursor: true });
+    this.mobileSoundBtnContainer.setInteractive({ useHandCursor: true, hitArea: topLeftButtonHitArea(44, 44), hitAreaCallback: Phaser.Geom.Rectangle.Contains });
     this.mobileSoundBtnContainer.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       pointer.event?.stopPropagation();
       audioManager.onFirstInteraction('mobile_sound_toggle');

@@ -118,27 +118,27 @@ export class BootScene extends Phaser.Scene {
       fontSize: '9px',
       color: '#ffffff',
       letterSpacing: 1,
-    }).setOrigin(0.5, 0.5).setDepth(9002);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9002);
 
     this.add.text(cx, cardY + 55, 'Modak Mahal', {
       fontFamily: 'Outfit, Georgia, serif',
       fontSize: '28px',
       fontStyle: 'bold',
       color: '#3e2723',
-    }).setOrigin(0.5, 0.5).setDepth(9002);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9002);
 
     this.add.text(cx, cardY + 88, 'Serve devotees. Grow the festival.', {
       fontFamily: 'Outfit, Georgia, serif',
       fontSize: '12px',
       color: '#6d4c41',
       fontStyle: 'italic',
-    }).setOrigin(0.5, 0.5).setDepth(9002);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9002);
 
     // Modak icon row
     this.add.text(cx, cardY + 115, '🕌  🙏  🎊  🥮  🎊  🙏  🕌', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '14px',
-    }).setOrigin(0.5, 0.5).setDepth(9002);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9002);
 
     // ── Progress bar frame ──
     const barW = cardW;
@@ -162,7 +162,7 @@ export class BootScene extends Phaser.Scene {
       fontFamily: 'Outfit, monospace',
       fontSize: '10px',
       color: '#c9953d',
-    }).setOrigin(0.5, 0).setDepth(9002);
+    }).setOrigin(0.5, 0).setResolution(2).setDepth(9002);
 
     // Draw empty bar at 0%
     this._updateLoadBar(0);
@@ -215,13 +215,13 @@ export class BootScene extends Phaser.Scene {
       fontSize: '13px',
       fontStyle: 'bold',
       color: '#b71c1c',
-    }).setOrigin(0.5, 0.5).setDepth(9011);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9011);
 
     this.add.text(cx, cy - 8, `"${file.key}"`, {
       fontFamily: 'Outfit, monospace',
       fontSize: '10px',
       color: '#4e342e',
-    }).setOrigin(0.5, 0.5).setDepth(9011);
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9011);
 
     // Retry button
     const btnW = 120;
@@ -237,7 +237,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: '12px',
       fontStyle: 'bold',
       color: '#1a0f0b',
-    }).setOrigin(0.5, 0.5).setDepth(9012).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5, 0.5).setResolution(2).setDepth(9012).setInteractive({ useHandCursor: true });
 
     btnLabel.on('pointerup', () => {
       this.scene.restart();
