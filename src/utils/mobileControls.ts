@@ -270,3 +270,272 @@ export function extractCameraViewport(
   };
 }
 
+export interface MobileControlPositions {
+  joystick: {
+    x: number;
+    y: number;
+    radius: number;
+    knobRadius: number;
+    deadZone: number;
+    hitRadius: number;
+    clearanceBottom: number;
+  };
+  actionButton: {
+    x: number;
+    y: number;
+    radius: number;
+  };
+  actionCard: {
+    x: number;
+    y: number;
+  };
+  pauseButton: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  fullscreenButton: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Calculates ergonomic screen positions for mobile touch controls:
+ * - Elevated joystick (around height - 115 in landscape, height - 110 in portrait) leaving ample downward drag clearance
+ * - Ergonomically paired action button
+ * - Action prompt card positioned safely away from thumb controls and HUD
+ * - Top-bar pause and fullscreen buttons with >= 44x44px touch targets
+ */
+export function getMobileControlPositions(
+  screenWidth: number,
+  screenHeight: number,
+  isPortrait: boolean
+): MobileControlPositions {
+  const joystickRadius = 46;
+  const joystickKnobRadius = 23;
+  const joystickDeadZone = 8;
+  const joystickHitRadius = 70;
+
+  let joyX: number;
+  let joyY: number;
+  let actX: number;
+  let actY: number;
+  let cardY: number;
+
+  if (isPortrait) {
+    joyX = 90;
+    joyY = screenHeight - 110;
+    actX = screenWidth - 70;
+    actY = screenHeight - 110;
+    // Safely above the top boundary of the joystick and action buttons
+    cardY = screenHeight - 175;
+  } else {
+    joyX = 100;
+    // Prevent encroaching on top HUD (54px) on unusually short screens
+    const minJoyY = 54 + joystickRadius + 15;
+    joyY = Math.max(minJoyY, screenHeight - 115);
+    actX = screenWidth - 75;
+    actY = joyY;
+    // Under the top HUD in central safe area
+    cardY = 74;
+  }
+
+  // Calculate bottom clearance when knob is dragged to maximum downward deflection
+  const maxDownwardReach = joyY + joystickRadius + joystickKnobRadius;
+  const clearanceBottom = Math.max(0, screenHeight - maxDownwardReach);
+
+  return {
+    joystick: {
+      x: joyX,
+      y: joyY,
+      radius: joystickRadius,
+      knobRadius: joystickKnobRadius,
+      deadZone: joystickDeadZone,
+      hitRadius: joystickHitRadius,
+      clearanceBottom
+    },
+    actionButton: {
+      x: actX,
+      y: actY,
+      radius: 36
+    },
+    actionCard: {
+      x: screenWidth / 2,
+      y: cardY
+    },
+    pauseButton: {
+      x: screenWidth - 48,
+      y: 7,
+      width: 44,
+      height: 44
+    },
+    fullscreenButton: {
+      x: screenWidth - 96,
+      y: 7,
+      width: 44,
+      height: 44
+    }
+  };
+}
+
+/**
+ * Checks if fullscreen mode is currently active across standard and vendor implementations.
+ */
+export function isFullscreenActive(doc?: any): boolean {
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  if (!d) return false;
+  return !!(
+    d.fullscreenElement ||
+    d.webkitFullscreenElement ||
+    d.mozFullScreenElement ||
+    d.msFullscreenElement
+  );
+}
+
+/**
+ * Checks if the browser environment supports requesting fullscreen.
+ */
+export function isFullscreenSupported(doc?: any): boolean {
+  const d = doc || (typeof document !== 'undefined' ? document : null);
+  if (!d) return false;
+  const isEnabled =
+    d.fullscreenEnabled ??
+    d.webkitFullscreenEnabled ??
+    d.mozFullScreenEnabled ??
+    d.msFullscreenEnabled;
+  if (isEnabled === false) return false;
+
+  const elem = d.documentElement || (typeof document !== 'undefined' ? document.documentElement : null);
+  if (!elem) return false;
+  return !!(
+    elem.requestFullscreen ||
+    elem.webkitRequestFullscreen ||
+    elem.mozRequestFullScreen ||
+    elem.msRequestFullscreen
+  );
+}
+
+export interface TourStep {
+  stationId: 'supplies' | 'steamer' | 'packing' | 'service' | 'upgrade';
+  stepNum: number;
+  totalSteps: number;
+  badge: string;
+  title: string;
+  desc: string;
+  tip: string;
+  worldPos: { x: number; y: number };
+}
+
+export const TOUR_STEPS: TourStep[] = [
+  {
+    stationId: 'supplies',
+    stepNum: 1,
+    totalSteps: 5,
+    badge: '1 • SUPPLIES',
+    title: 'Supply Shelf',
+    desc: 'Buy recipe bundles (₹12) of rice flour, coconut, jaggery & boxes. Return ingredients here anytime to free hands.',
+    tip: '⏱ 10-minute festival timer starts only AFTER your first sale—explore without rushing!',
+    worldPos: { x: 205, y: 135 }
+  },
+  {
+    stationId: 'steamer',
+    stepNum: 2,
+    totalSteps: 5,
+    badge: '2 • STEAMING',
+    title: 'Brass Steamer',
+    desc: 'Walk close to load recipe bundles into Steamer 1. Steams fresh modaks to golden perfection in 8s.',
+    tip: '💡 Steamer 2 unlocks later at the Upgrade Desk to double your kitchen throughput.',
+    worldPos: { x: 405, y: 135 }
+  },
+  {
+    stationId: 'packing',
+    stepNum: 3,
+    totalSteps: 5,
+    badge: '3 • PACKING',
+    title: 'Packing Bench',
+    desc: 'Deposit cooked modaks to pack 3 festive gift boxes (3s). Your hands stay free while packing.',
+    tip: '👥 You can hire an automated Packer NPC later to box modaks while you make deliveries.',
+    worldPos: { x: 380, y: 390 }
+  },
+  {
+    stationId: 'service',
+    stepNum: 4,
+    totalSteps: 5,
+    badge: '4 • SERVICE',
+    title: 'Devotee Counter',
+    desc: 'Serve devotees waiting outside. Earn ₹10/box plus speed tips (up to +₹3/box) for rapid service!',
+    tip: '🚨 Completing your 1st sale here officially opens the festival & starts the 10-minute round clock.',
+    worldPos: { x: 700, y: 390 }
+  },
+  {
+    stationId: 'upgrade',
+    stepNum: 5,
+    totalSteps: 5,
+    badge: '5 • UPGRADES',
+    title: 'Management Desk & Finale',
+    desc: 'Invest your profits into 4 upgrades: Carry Capacity, Auto-Packer, Cashier, and Steamer 2.',
+    tip: '⭐ Owning all 4 upgrades unlocks Grand Pandal Dispatch (deliver 12 boxes to WIN)!',
+    worldPos: { x: 740, y: 135 }
+  }
+];
+
+export interface TourCardLayout {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  isPortrait: boolean;
+}
+
+export function getTourCardLayout(
+  screenWidth: number,
+  screenHeight: number,
+  isPortrait: boolean
+): TourCardLayout {
+  const x = screenWidth / 2;
+  let width: number;
+  let height: number;
+  let y: number;
+
+  if (isPortrait) {
+    width = Math.min(366, screenWidth - 24);
+    height = 160;
+    y = screenHeight - 100;
+  } else if (screenHeight <= 500) {
+    width = Math.min(540, screenWidth - 36);
+    height = 124;
+    y = screenHeight - 74;
+  } else {
+    width = Math.min(560, screenWidth - 60);
+    height = 144;
+    y = screenHeight - 95;
+  }
+
+  return { width, height, x, y, isPortrait };
+}
+
+export function getTourCameraScroll(
+  worldX: number,
+  worldY: number,
+  screenWidth: number,
+  screenHeight: number,
+  zoom: number,
+  worldWidth = LOGICAL_WIDTH,
+  worldHeight = LOGICAL_HEIGHT
+): { scrollX: number; scrollY: number } {
+  const z = zoom > 0 ? zoom : 1;
+  const visibleW = screenWidth / z;
+  const visibleH = screenHeight / z;
+
+  const maxScrollX = Math.max(0, worldWidth - visibleW);
+  const maxScrollY = Math.max(0, worldHeight - visibleH);
+
+  const scrollX = Math.max(0, Math.min(maxScrollX, worldX - visibleW / 2));
+  const scrollY = Math.max(0, Math.min(maxScrollY, worldY - visibleH / 2));
+
+  return { scrollX, scrollY };
+}

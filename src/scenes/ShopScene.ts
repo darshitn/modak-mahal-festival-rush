@@ -12,7 +12,7 @@ import { DispatchStation } from '../stations/DispatchStation.ts';
 import { PackerNPC, CashierNPC } from '../entities/Staff.ts';
 import { LOGICAL_HEIGHT, LOGICAL_WIDTH } from '../config/layout.ts';
 import { CustomerSaleResult } from '../types/index.ts';
-import { getCameraLayoutConfig } from '../utils/mobileControls.ts';
+import { getCameraLayoutConfig, getTourCameraScroll } from '../utils/mobileControls.ts';
 
 export interface CollisionBlocker {
   id: string;
@@ -41,6 +41,8 @@ export class ShopScene extends Phaser.Scene {
   public isCollisionOverlayVisible = false;
   private collisionOverlayGraphics?: Phaser.GameObjects.Graphics;
   public badgeDispatch?: Phaser.GameObjects.Sprite;
+  private tourHighlightGraphics?: Phaser.GameObjects.Graphics;
+  private tourMarkerContainer?: Phaser.GameObjects.Container;
 
   public isDispatchUnlocked(): boolean {
     const stage = this.campaignState?.stage;
@@ -257,6 +259,125 @@ export class ShopScene extends Phaser.Scene {
         (LOGICAL_WIDTH - visibleWidth) / 2,
         (LOGICAL_HEIGHT - visibleHeight) / 2
       );
+    }
+  }
+
+  /**
+   * Smoothly pans the camera on mobile viewports to bring an offscreen station
+   * into view without moving the player entity.
+   */
+  public focusCameraOnStation(worldX: number, worldY: number) {
+    const size = this.scale.gameSize;
+    const camera = this.cameras.main;
+    const hasCoarse = typeof window !== 'undefined' && (
+      window.matchMedia?.('(pointer: coarse)').matches ||
+      ('ontouchstart' in window) ||
+      (navigator.maxTouchPoints > 0)
+    );
+    const layout = getCameraLayoutConfig(size.width, size.height, hasCoarse);
+
+    // Desktop viewports see the full 960x540 shop already
+    if (!layout.isMobile) return;
+
+    camera.stopFollow();
+    const scroll = getTourCameraScroll(worldX, worldY, size.width, size.height, camera.zoom);
+
+    this.tweens.killTweensOf(camera);
+    this.tweens.add({
+      targets: camera,
+      scrollX: scroll.scrollX,
+      scrollY: scroll.scrollY,
+      duration: 350,
+      ease: 'Cubic.easeOut'
+    });
+  }
+
+  /**
+   * Restores normal camera-follow-player behavior when the tour closes or finishes.
+   */
+  public restoreCameraFollow() {
+    this.tweens.killTweensOf(this.cameras.main);
+    this.configureCamera(this.scale.gameSize);
+  }
+
+  /**
+   * Highlights a station in the game world with an animated floor pulse and floating pin.
+   */
+  public showTourStationHighlight(worldX: number, worldY: number, label: string) {
+    this.clearTourStationHighlight();
+
+    this.tourHighlightGraphics = this.add.graphics();
+    this.tourHighlightGraphics.setDepth(4500);
+
+    this.tourMarkerContainer = this.add.container(worldX, worldY - 55);
+    this.tourMarkerContainer.setDepth(4600);
+
+    const pinBg = this.add.graphics();
+    const pinText = this.add.text(0, -2, label, {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '11px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5).setResolution(2);
+
+    const pinW = pinText.width + 20;
+    pinBg.fillStyle(0xd97706, 0.95);
+    pinBg.fillRoundedRect(-pinW / 2, -12, pinW, 24, 6);
+    pinBg.lineStyle(1.5, 0xffe082, 1);
+    pinBg.strokeRoundedRect(-pinW / 2, -12, pinW, 24, 6);
+
+    // Downward arrow pointer
+    pinBg.fillStyle(0xd97706, 0.95);
+    pinBg.beginPath();
+    pinBg.moveTo(-6, 12);
+    pinBg.lineTo(6, 12);
+    pinBg.lineTo(0, 18);
+    pinBg.closePath();
+    pinBg.fillPath();
+    pinBg.lineStyle(1.5, 0xffe082, 1);
+    pinBg.strokePath();
+
+    this.tourMarkerContainer.add([pinBg, pinText]);
+
+    // Marker floating bob animation
+    this.tweens.add({
+      targets: this.tourMarkerContainer,
+      y: worldY - 62,
+      duration: 550,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    // Floor highlight pulsing ellipse
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 900,
+      repeat: -1,
+      yoyo: true,
+      onUpdate: (tween) => {
+        if (!this.tourHighlightGraphics) return;
+        const v = tween.getValue() ?? 0;
+        this.tourHighlightGraphics.clear();
+        this.tourHighlightGraphics.lineStyle(2 + v * 1.5, 0xffd54f, 0.85 - v * 0.35);
+        this.tourHighlightGraphics.strokeEllipse(worldX, worldY + 12, 72 + v * 16, 36 + v * 8);
+        this.tourHighlightGraphics.fillStyle(0xffd54f, 0.12 * (1 - v));
+        this.tourHighlightGraphics.fillEllipse(worldX, worldY + 12, 72 + v * 16, 36 + v * 8);
+      }
+    });
+  }
+
+  public clearTourStationHighlight() {
+    if (this.tourMarkerContainer) {
+      this.tweens.killTweensOf(this.tourMarkerContainer);
+      this.tourMarkerContainer.destroy();
+      this.tourMarkerContainer = undefined;
+    }
+    if (this.tourHighlightGraphics) {
+      this.tweens.killTweensOf(this.tourHighlightGraphics);
+      this.tourHighlightGraphics.destroy();
+      this.tourHighlightGraphics = undefined;
     }
   }
 

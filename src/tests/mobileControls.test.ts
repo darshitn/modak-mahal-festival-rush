@@ -4,7 +4,13 @@ import {
   clampFeedbackToViewport,
   combineInputVectors,
   getCameraLayoutConfig,
+  getMobileControlPositions,
   isMobileLayout,
+  isFullscreenActive,
+  isFullscreenSupported,
+  TOUR_STEPS,
+  getTourCardLayout,
+  getTourCameraScroll,
   type CameraViewportBounds
 } from '../utils/mobileControls.ts';
 
@@ -261,6 +267,221 @@ describe('Mobile Controls & Layout Helpers', () => {
         const screenLeft = (resLeft.minX - cam.scrollX) * zoom;
         expect(screenLeft).toBeGreaterThanOrEqual(7.99);
       }
+    });
+  });
+
+  describe('getMobileControlPositions', () => {
+    it('positions landscape controls with elevated joystick and ample downward drag clearance', () => {
+      // 844x390 landscape mobile
+      const pos = getMobileControlPositions(844, 390, false);
+
+      // Elevated joystick around screenHeight - 115, moved 20px right to x = 100
+      expect(pos.joystick.y).toBe(390 - 115); // 275
+      expect(pos.joystick.x).toBe(100);
+
+      // Full downward drag knob reach is joyY + radius + knobRadius = 275 + 46 + 23 = 344
+      // Leaving 46px clearance above bottom edge
+      expect(pos.joystick.clearanceBottom).toBe(46);
+      expect(pos.joystick.clearanceBottom).toBeGreaterThanOrEqual(40);
+
+      // Ergonomically matched action button height
+      expect(pos.actionButton.y).toBe(pos.joystick.y);
+      expect(pos.actionButton.x).toBe(844 - 75);
+
+      // Action card floats in top safe area below 54px mobile HUD
+      expect(pos.actionCard.y).toBe(74);
+
+      // Top bar buttons placed side-by-side with >= 44x44px touch targets
+      expect(pos.pauseButton.x).toBe(844 - 48);
+      expect(pos.pauseButton.y).toBe(7);
+      expect(pos.pauseButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.pauseButton.height).toBeGreaterThanOrEqual(44);
+
+      expect(pos.fullscreenButton.x).toBe(844 - 96);
+      expect(pos.fullscreenButton.y).toBe(7);
+      expect(pos.fullscreenButton.width).toBeGreaterThanOrEqual(44);
+      expect(pos.fullscreenButton.height).toBeGreaterThanOrEqual(44);
+    });
+
+    it('positions portrait controls with elevated joystick and ample downward drag clearance', () => {
+      // 390x844 portrait mobile
+      const pos = getMobileControlPositions(390, 844, true);
+
+      // Elevated joystick around screenHeight - 110, moved 20px right to x = 90
+      expect(pos.joystick.y).toBe(844 - 110); // 734
+      expect(pos.joystick.x).toBe(90);
+
+      // Downward drag clearance: 844 - (734 + 46 + 23) = 41px
+      expect(pos.joystick.clearanceBottom).toBe(41);
+      expect(pos.joystick.clearanceBottom).toBeGreaterThanOrEqual(40);
+
+      // Ergonomically matched action button
+      expect(pos.actionButton.y).toBe(pos.joystick.y);
+      expect(pos.actionButton.x).toBe(390 - 70);
+
+      // Action card positioned safely above joystick/action top boundary (734 - 46 = 688)
+      expect(pos.actionCard.y).toBe(844 - 175); // 669
+      expect(pos.actionCard.y).toBeLessThan(pos.joystick.y - pos.joystick.radius);
+
+      // Fullscreen and pause buttons
+      expect(pos.fullscreenButton.x).toBe(390 - 96);
+      expect(pos.pauseButton.x).toBe(390 - 48);
+    });
+
+    it('guards against crowding top HUD on short landscape screens', () => {
+      // Very short landscape screen: 640x320
+      const pos = getMobileControlPositions(640, 320, false);
+      expect(pos.joystick.y).toBe(320 - 115); // 205
+      // Top of joystick base (205 - 46 = 159) is safely below top HUD (54px)
+      expect(pos.joystick.y - pos.joystick.radius).toBeGreaterThan(54);
+      expect(pos.joystick.clearanceBottom).toBe(46);
+    });
+
+    it('ensures complete joystick touch hit area stays inside narrow mobile screens', () => {
+      // 320x568 small mobile portrait
+      const pos = getMobileControlPositions(320, 568, true);
+      expect(pos.joystick.x - pos.joystick.hitRadius).toBeGreaterThanOrEqual(0);
+      expect(pos.joystick.x + pos.joystick.hitRadius).toBeLessThanOrEqual(320);
+
+      // 640x320 small mobile landscape
+      const landPos = getMobileControlPositions(640, 320, false);
+      expect(landPos.joystick.x - landPos.joystick.hitRadius).toBeGreaterThanOrEqual(0);
+      expect(landPos.joystick.x + landPos.joystick.hitRadius).toBeLessThanOrEqual(640);
+    });
+  });
+
+  describe('Fullscreen Helpers', () => {
+    it('detects active fullscreen across standard and vendor prefixed document properties', () => {
+      expect(isFullscreenActive({} as any)).toBe(false);
+      expect(isFullscreenActive({ fullscreenElement: {} } as any)).toBe(true);
+      expect(isFullscreenActive({ webkitFullscreenElement: {} } as any)).toBe(true);
+      expect(isFullscreenActive({ mozFullScreenElement: {} } as any)).toBe(true);
+      expect(isFullscreenActive({ msFullscreenElement: {} } as any)).toBe(true);
+    });
+
+    it('detects browser fullscreen support correctly', () => {
+      // Supported standard
+      const standardDoc = {
+        fullscreenEnabled: true,
+        documentElement: { requestFullscreen: () => {} }
+      };
+      expect(isFullscreenSupported(standardDoc as any)).toBe(true);
+
+      // Supported webkit
+      const webkitDoc = {
+        webkitFullscreenEnabled: true,
+        documentElement: { webkitRequestFullscreen: () => {} }
+      };
+      expect(isFullscreenSupported(webkitDoc as any)).toBe(true);
+
+      // Explicitly disabled
+      const disabledDoc = {
+        fullscreenEnabled: false,
+        documentElement: { requestFullscreen: () => {} }
+      };
+      expect(isFullscreenSupported(disabledDoc as any)).toBe(false);
+
+      // Unsupported browser (e.g. mobile Safari without element requestFullscreen)
+      const unsupportedDoc = {
+        documentElement: {}
+      };
+      expect(isFullscreenSupported(unsupportedDoc as any)).toBe(false);
+    });
+  });
+
+  describe('New Player Station Tour Helpers', () => {
+    it('defines all 5 tour steps in canonical progression order', () => {
+      expect(TOUR_STEPS).toHaveLength(5);
+      expect(TOUR_STEPS.map((s) => s.stationId)).toEqual([
+        'supplies',
+        'steamer',
+        'packing',
+        'service',
+        'upgrade'
+      ]);
+    });
+
+    it('points to accurate world coordinates for each shop station', () => {
+      const [supplies, steamer, packing, service, upgrade] = TOUR_STEPS;
+      expect(supplies.worldPos).toEqual({ x: 205, y: 135 });
+      expect(steamer.worldPos).toEqual({ x: 405, y: 135 });
+      expect(packing.worldPos).toEqual({ x: 380, y: 390 });
+      expect(service.worldPos).toEqual({ x: 700, y: 390 });
+      expect(upgrade.worldPos).toEqual({ x: 740, y: 135 });
+    });
+
+    it('prominently clarifies that 10-minute timer starts after first sale', () => {
+      const supplies = TOUR_STEPS[0];
+      const service = TOUR_STEPS[3];
+      expect(supplies.tip).toMatch(/10-minute/i);
+      expect(supplies.tip).toMatch(/first sale/i);
+      expect(service.tip).toMatch(/10-minute/i);
+      expect(service.tip).toMatch(/1st sale/i);
+    });
+
+    it('prominently clarifies that Grand Pandal Dispatch unlocks after all 4 upgrades with 12 boxes', () => {
+      const upgrade = TOUR_STEPS[4];
+      expect(upgrade.tip).toMatch(/all 4 upgrades/i);
+      expect(upgrade.tip).toMatch(/Grand Pandal Dispatch/i);
+      expect(upgrade.tip).toMatch(/12 boxes/i);
+    });
+
+    it('calculates ergonomic card layout across portrait, short landscape, and desktop', () => {
+      // 390x844 portrait: stays at bottom, leaves stations visible above
+      const portraitLayout = getTourCardLayout(390, 844, true);
+      expect(portraitLayout.width).toBeLessThanOrEqual(366);
+      expect(portraitLayout.height).toBe(160);
+      expect(portraitLayout.y).toBe(844 - 100);
+      expect(portraitLayout.x).toBe(195);
+
+      // 844x390 landscape: compact height, leaving top unobstructed
+      const landscapeLayout = getTourCardLayout(844, 390, false);
+      expect(landscapeLayout.width).toBeLessThanOrEqual(540);
+      expect(landscapeLayout.height).toBe(124);
+      expect(landscapeLayout.y).toBe(390 - 74);
+      expect(landscapeLayout.x).toBe(422);
+
+      // 1366x768 desktop: wide comfortable card
+      const desktopLayout = getTourCardLayout(1366, 768, false);
+      expect(desktopLayout.width).toBe(560);
+      expect(desktopLayout.height).toBe(144);
+      expect(desktopLayout.y).toBe(768 - 95);
+      expect(desktopLayout.x).toBe(683);
+    });
+
+    it('computes camera scroll that brings offscreen stations into view on mobile portrait', () => {
+      // On 390x844 portrait (zoom = 1.563), visible width = 390 / 1.563 ≈ 249.5
+      // Max scrollX = 960 - 249.5 = 710.5
+      const zoom = 844 / 540; // 1.56296
+      const visibleW = 390 / zoom;
+
+      // Supplies at x = 205 (already near left side)
+      const suppliesScroll = getTourCameraScroll(205, 135, 390, 844, zoom);
+      expect(suppliesScroll.scrollX).toBeCloseTo(205 - visibleW / 2, 0);
+
+      // Service Counter at x = 700 (offscreen when camera is at player x = 260)
+      const serviceScroll = getTourCameraScroll(700, 390, 390, 844, zoom);
+      expect(serviceScroll.scrollX).toBeGreaterThanOrEqual(550);
+      // Ensure target x = 700 is inside the visible window [scrollX, scrollX + visibleW]
+      expect(serviceScroll.scrollX).toBeLessThanOrEqual(700);
+      expect(serviceScroll.scrollX + visibleW).toBeGreaterThanOrEqual(700);
+
+      // Upgrades Desk at x = 740 (offscreen right)
+      const upgradeScroll = getTourCameraScroll(740, 135, 390, 844, zoom);
+      expect(upgradeScroll.scrollX).toBeGreaterThanOrEqual(600);
+      expect(upgradeScroll.scrollX).toBeLessThanOrEqual(740);
+      expect(upgradeScroll.scrollX + visibleW).toBeGreaterThanOrEqual(740);
+    });
+
+    it('clamps tour camera scroll to valid world bounds', () => {
+      // Station beyond right bound
+      const extremeRight = getTourCameraScroll(1500, 300, 390, 844, 1.5);
+      expect(extremeRight.scrollX).toBe(960 - 390 / 1.5);
+
+      // Station at negative coordinates
+      const extremeLeft = getTourCameraScroll(-100, -50, 390, 844, 1.5);
+      expect(extremeLeft.scrollX).toBe(0);
+      expect(extremeLeft.scrollY).toBe(0);
     });
   });
 });
