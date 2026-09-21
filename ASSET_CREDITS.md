@@ -96,3 +96,30 @@
 - **Phaser 3.90.0**: HTML5 Game Framework (MIT License, Richard Davey).
 - **Vite 6**: Frontend tooling (MIT License).
 - **TypeScript 5**: Language (Apache License 2.0).
+
+## 6. FIRST_LOAD_PERFORMANCE Pass (2026-09-21)
+
+All 10 actively preloaded raster assets were converted from PNG to WebP using `sharp` at quality 88.
+Original PNG files are kept locally as backups and are not uploaded to GitHub Pages.
+`station_supply_shelf-v1.png` preload was removed — it was never referenced in gameplay code (only v2 is used).
+
+### Before / After Size Comparison
+
+| File | PNG (Before) | WebP (After) | Saved |
+|------|-------------|-------------|-------|
+| bg_hall_illustrated-v3-clean | 1174 KB | 91 KB | 92.3% |
+| pandal_ganesha-v2 | 1384 KB | 237 KB | 82.9% |
+| steamer_brass-v1 | 1088 KB | 142 KB | 87.0% |
+| steamer_input_table-v1 | 855 KB | 86 KB | 89.9% |
+| steamer_output_table-v1 | 911 KB | 97 KB | 89.3% |
+| station_supply_shelf-v2 | 1607 KB | 206 KB | 87.2% |
+| station_upgrade_desk-v1 | 1298 KB | 192 KB | 85.2% |
+| station_packing_bench-v1 | 1124 KB | 136 KB | 87.9% |
+| station_service_counter-v1 | 1025 KB | 107 KB | 89.6% |
+| modak_platter-v1 | 1846 KB | 173 KB | 90.6% |
+| **TOTAL** | **12.02 MB** | **1.43 MB** | **88.1%** |
+
+Removed unused preload: `station_supply_shelf-v1.png` (1.39 MB) — saves an additional 1.39 MB.
+
+**Net startup artwork transfer: ~13.4 MB → 1.43 MB (target was < 4 MB ✅)**
+

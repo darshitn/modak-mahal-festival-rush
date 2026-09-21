@@ -1,26 +1,65 @@
 import Phaser from 'phaser';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Palette constants shared between loading screen and procedural art
+// ─────────────────────────────────────────────────────────────────────────────
+const LOAD_BG        = 0x1a0f0b; // dark mahogany
+const LOAD_GOLD      = 0xc9953d; // brass / gold accent
+const LOAD_CREAM     = 0xfffdf7; // cream card
+const LOAD_DARK_TEXT = 0x3e2723; // teak dark text
+const LOAD_GREEN     = 0x275239; // forest green badge
+
 export class BootScene extends Phaser.Scene {
   private readonly artScale = 2;
+
+  // Loading screen Phaser objects (created in preload, destroyed in create)
+  private _loadBg!: Phaser.GameObjects.Rectangle;
+  private _loadBar!: Phaser.GameObjects.Graphics;
+  private _loadCaption!: Phaser.GameObjects.Text;
+  private _loadErrorShown = false;
 
   constructor() {
     super({ key: 'BootScene' });
   }
 
   preload() {
-    this.load.image('bg_hall_illustrated', 'assets/generated/bg_hall_illustrated-v3-clean.png');
-    this.load.image('pandal_ganesha', 'assets/generated/pandal_ganesha-v2.png');
-    this.load.image('raster_steamer_brass', 'assets/generated/steamer_brass-v1.png');
-    this.load.image('raster_steamer_input_table', 'assets/generated/steamer_input_table-v1.png');
-    this.load.image('raster_steamer_output_table', 'assets/generated/steamer_output_table-v1.png');
-    this.load.image('raster_supply_shelf', 'assets/generated/station_supply_shelf-v1.png');
-    this.load.image('raster_supply_shelf_v2', 'assets/generated/station_supply_shelf-v2.png');
-    this.load.image('raster_upgrade_desk', 'assets/generated/station_upgrade_desk-v1.png');
-    this.load.image('raster_packing_bench', 'assets/generated/station_packing_bench-v1.png');
-    this.load.image('raster_service_counter', 'assets/generated/station_service_counter-v1.png');
-    this.load.image('raster_modak_platter', 'assets/generated/modak_platter-v1.png');
+    // ── 1. Draw branded loading screen immediately ──────────────────────────
+    this._createLoadingScreen();
 
-    // Generate procedural textures programmatically to guarantee 100% offline self-containment
+    // ── 2. Wire up progress + error callbacks ───────────────────────────────
+    this.load.on('progress', (value: number) => {
+      this._updateLoadBar(value);
+    });
+
+    this.load.on('fileprogress', (file: { key: string }) => {
+      if (this._loadCaption) {
+        this._loadCaption.setText(`Loading… ${file.key}`);
+      }
+    });
+
+    this.load.on('loaderror', (file: { key: string; url: string }) => {
+      if (!this._loadErrorShown) {
+        this._loadErrorShown = true;
+        this._showLoadError(file);
+      }
+    });
+
+    // ── 3. Raster assets (WebP — 88.1% smaller than PNG originals) ──────────
+    // NOTE: originals kept locally as .png backups; do NOT add audio here.
+    // Audio files must be loaded lazily inside ShopScene / UIScene after the
+    // user interacts with the game (browser autoplay policy requirement).
+    this.load.image('bg_hall_illustrated', 'assets/generated/bg_hall_illustrated-v3-clean.webp');
+    this.load.image('pandal_ganesha',      'assets/generated/pandal_ganesha-v2.webp');
+    this.load.image('raster_steamer_brass',        'assets/generated/steamer_brass-v1.webp');
+    this.load.image('raster_steamer_input_table',  'assets/generated/steamer_input_table-v1.webp');
+    this.load.image('raster_steamer_output_table', 'assets/generated/steamer_output_table-v1.webp');
+    this.load.image('raster_supply_shelf_v2',  'assets/generated/station_supply_shelf-v2.webp');
+    this.load.image('raster_upgrade_desk',     'assets/generated/station_upgrade_desk-v1.webp');
+    this.load.image('raster_packing_bench',    'assets/generated/station_packing_bench-v1.webp');
+    this.load.image('raster_service_counter',  'assets/generated/station_service_counter-v1.webp');
+    this.load.image('raster_modak_platter',    'assets/generated/modak_platter-v1.webp');
+
+    // ── 4. Generate procedural textures (100% offline, zero network cost) ───
     this.createPlayerTexture();
     this.createItemTextures();
     this.createStationTextures();
@@ -30,7 +69,184 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Destroy loading screen objects before transitioning
+    this._loadBg?.destroy();
+    this._loadBar?.destroy();
+    this._loadCaption?.destroy();
     this.scene.start('ShopScene');
+  }
+
+  // ── Loading screen helpers ─────────────────────────────────────────────────
+
+  private _createLoadingScreen() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Full-screen dark mahogany backdrop
+    this._loadBg = this.add.rectangle(cx, cy, W, H, LOAD_BG).setDepth(9000);
+
+    const gfx = this.add.graphics().setDepth(9001);
+    this._loadBar = gfx;
+
+    // ── Decorative border ──
+    gfx.lineStyle(2, LOAD_GOLD, 0.6);
+    gfx.strokeRect(12, 12, W - 24, H - 24);
+
+    // ── Title card ──
+    const cardW = Math.min(460, W - 48);
+    const cardH = 160;
+    const cardX = cx - cardW / 2;
+    const cardY = cy - cardH / 2 - 30;
+
+    gfx.fillStyle(LOAD_CREAM, 1);
+    gfx.fillRoundedRect(cardX, cardY, cardW, cardH, 10);
+    gfx.lineStyle(2, LOAD_DARK_TEXT, 1);
+    gfx.strokeRoundedRect(cardX, cardY, cardW, cardH, 10);
+    gfx.lineStyle(1.5, LOAD_GOLD, 1);
+    gfx.strokeRoundedRect(cardX + 5, cardY + 5, cardW - 10, cardH - 10, 7);
+
+    // Festival badge
+    const badgeW = 110;
+    const badgeH = 22;
+    gfx.fillStyle(LOAD_GREEN, 1);
+    gfx.fillRoundedRect(cx - badgeW / 2, cardY + 12, badgeW, badgeH, 11);
+
+    this.add.text(cx, cardY + 23, '🎉 FESTIVAL RUSH', {
+      fontFamily: 'Outfit, Georgia, serif',
+      fontSize: '9px',
+      color: '#ffffff',
+      letterSpacing: 1,
+    }).setOrigin(0.5, 0.5).setDepth(9002);
+
+    this.add.text(cx, cardY + 55, 'Modak Mahal', {
+      fontFamily: 'Outfit, Georgia, serif',
+      fontSize: '28px',
+      fontStyle: 'bold',
+      color: '#3e2723',
+    }).setOrigin(0.5, 0.5).setDepth(9002);
+
+    this.add.text(cx, cardY + 88, 'Serve devotees. Grow the festival.', {
+      fontFamily: 'Outfit, Georgia, serif',
+      fontSize: '12px',
+      color: '#6d4c41',
+      fontStyle: 'italic',
+    }).setOrigin(0.5, 0.5).setDepth(9002);
+
+    // Modak icon row
+    this.add.text(cx, cardY + 115, '🕌  🙏  🎊  🥮  🎊  🙏  🕌', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '14px',
+    }).setOrigin(0.5, 0.5).setDepth(9002);
+
+    // ── Progress bar frame ──
+    const barW = cardW;
+    const barH = 12;
+    const barX = cardX;
+    const barY = cardY + cardH + 16;
+
+    gfx.fillStyle(LOAD_CREAM, 1);
+    gfx.fillRoundedRect(barX, barY, barW, barH, 6);
+    gfx.lineStyle(1.5, LOAD_DARK_TEXT, 0.7);
+    gfx.strokeRoundedRect(barX, barY, barW, barH, 6);
+
+    // Store bar metrics for progress updates using the graphics object's userData
+    (gfx as unknown as Record<string, unknown>)['_barX'] = barX;
+    (gfx as unknown as Record<string, unknown>)['_barY'] = barY;
+    (gfx as unknown as Record<string, unknown>)['_barW'] = barW;
+    (gfx as unknown as Record<string, unknown>)['_barH'] = barH;
+
+    // ── Caption ──
+    this._loadCaption = this.add.text(cx, barY + barH + 10, 'Loading…', {
+      fontFamily: 'Outfit, monospace',
+      fontSize: '10px',
+      color: '#c9953d',
+    }).setOrigin(0.5, 0).setDepth(9002);
+
+    // Draw empty bar at 0%
+    this._updateLoadBar(0);
+  }
+
+  private _updateLoadBar(value: number) {
+    const gfx = this._loadBar;
+    if (!gfx || !gfx.scene) return;
+
+    const barX = (gfx as unknown as Record<string, unknown>)['_barX'] as number;
+    const barY = (gfx as unknown as Record<string, unknown>)['_barY'] as number;
+    const barW = (gfx as unknown as Record<string, unknown>)['_barW'] as number;
+    const barH = (gfx as unknown as Record<string, unknown>)['_barH'] as number;
+
+    // Erase old fill region only (keep frame lines drawn at creation)
+    gfx.fillStyle(LOAD_CREAM, 1);
+    gfx.fillRoundedRect(barX + 2, barY + 2, barW - 4, barH - 4, 4);
+
+    const fillW = Math.max(0, (barW - 4) * value);
+    if (fillW > 0) {
+      // Gold gradient fill via two overlapping rects
+      gfx.fillStyle(LOAD_GOLD, 1);
+      gfx.fillRoundedRect(barX + 2, barY + 2, fillW, barH - 4, 4);
+      // Lighter shimmer stripe on top third
+      gfx.fillStyle(0xffd54f, 0.55);
+      gfx.fillRoundedRect(barX + 2, barY + 2, fillW, Math.floor((barH - 4) / 3), 4);
+    }
+  }
+
+  private _showLoadError(file: { key: string; url: string }) {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    // Semi-transparent error overlay
+    const errGfx = this.add.graphics().setDepth(9010);
+    errGfx.fillStyle(0x000000, 0.55);
+    errGfx.fillRect(0, 0, W, H);
+
+    const cardW = Math.min(380, W - 40);
+    const cardH = 120;
+    errGfx.fillStyle(0xffccbc, 1);
+    errGfx.fillRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 8);
+    errGfx.lineStyle(2, 0xb71c1c, 1);
+    errGfx.strokeRoundedRect(cx - cardW / 2, cy - cardH / 2, cardW, cardH, 8);
+
+    this.add.text(cx, cy - 30, '⚠ Asset failed to load', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '13px',
+      fontStyle: 'bold',
+      color: '#b71c1c',
+    }).setOrigin(0.5, 0.5).setDepth(9011);
+
+    this.add.text(cx, cy - 8, `"${file.key}"`, {
+      fontFamily: 'Outfit, monospace',
+      fontSize: '10px',
+      color: '#4e342e',
+    }).setOrigin(0.5, 0.5).setDepth(9011);
+
+    // Retry button
+    const btnW = 120;
+    const btnH = 30;
+    const btnX = cx - btnW / 2;
+    const btnY = cy + 20;
+
+    errGfx.fillStyle(LOAD_GOLD, 1);
+    errGfx.fillRoundedRect(btnX, btnY, btnW, btnH, 6);
+
+    const btnLabel = this.add.text(cx, btnY + 15, 'Retry', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#1a0f0b',
+    }).setOrigin(0.5, 0.5).setDepth(9012).setInteractive({ useHandCursor: true });
+
+    btnLabel.on('pointerup', () => {
+      this.scene.restart();
+    });
+
+    // Also allow tap anywhere to retry
+    this.input.once('pointerup', () => {
+      this.scene.restart();
+    });
   }
 
   private makeArtCanvas(width: number, height: number) {
