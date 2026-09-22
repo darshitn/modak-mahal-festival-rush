@@ -116,9 +116,9 @@ If the 10-minute festival clock reaches zero before you dispatch 12 boxes, the f
 
 ## Desktop & Mobile Support
 
-- Fully responsive for common desktop (1366×768, 1920×1080) and mobile (390×844, 1024×600) viewport sizes.
-- Touch virtual thumbstick activates on mobile for player movement.
-- HUD adapts to compact mode on smaller screens.
+- Responsive desktop and mobile layouts, including portrait and landscape play.
+- Mobile includes a virtual joystick, contextual action button, sound toggle, pause control, and fullscreen button where the browser supports it.
+- The first-time tour explains each station and recommends landscape orientation for a wider view.
 
 ---
 
@@ -137,7 +137,7 @@ npm ci
 # Start local development server (http://localhost:3000/)
 npm run dev
 
-# Run automated tests (65 tests across economy, campaign, and customer service)
+# Run automated tests
 npm test -- --run
 
 # Build production bundle
@@ -183,20 +183,14 @@ This game was developed with the assistance of AI coding tools (Google Antigravi
 ## Known Limitations
 
 - Local save/resume (on page refresh) is deferred — not implemented in this submission. Each page load starts a fresh game.
-- Audio system is not implemented in this version.
+- Music and feedback cues begin only after the player's first interaction, as required by browser audio policies. Use the sound button or `M` to mute/unmute.
 - First-floor expansion is locked behind a "later upgrade" visual — the staircase is present but non-functional (intentionally deferred post-contest feature).
-- Mobile touch compatibility has been thoroughly tested via automated headless Chrome CDP touch-emulation across mobile viewports (390×844 portrait, 412×915 portrait, 844×390 landscape); physical testing on diverse handheld mobile devices remains recommended.
+- The mobile layouts were verified in browser viewport emulation. Behaviour can still vary across physical devices and browsers.
 
 ---
 
-## Submission Checklist
+## Project Links
 
-| Item | Status |
-|---|---|
-| 🎮 Live playable link | https://darshitn.github.io/modak-mahal-festival-rush/ |
-| 📦 Source repository | https://github.com/darshitn/modak-mahal-festival-rush |
-| 📖 How to play / README | ✅ This document |
-| 🎨 Asset credits | ✅ [ASSET_CREDITS.md](./ASSET_CREDITS.md) |
-| 🎬 Demo video (1–3 min) | ⚠️ **[USER ACTION REQUIRED — record and upload demo]** |
-| 👥 Team details | ⚠️ **[USER ACTION REQUIRED — fill in registration form]** |
-| 🤖 Organizer AI-policy confirmation | ⚠️ **[USER ACTION REQUIRED — confirm with organizer]** |
+- [Play Modak Mahal: Festival Rush](https://darshitn.github.io/modak-mahal-festival-rush/)
+- [Source Repository](https://github.com/darshitn/modak-mahal-festival-rush)
+- [Asset Credits](./ASSET_CREDITS.md)
